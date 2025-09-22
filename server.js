@@ -8,7 +8,16 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
 
 const app = express();
-app.use(cors());
+
+// === YEH HAI AHEM TABDEELI ===
+// Hum server ko bata rahe hain ke sirf is URL se aane wali requests ko allow karna hai.
+const corsOptions = {
+  origin: 'https://ai-agent-frontend.vercel.app', // <-- Yahan apna frontend ka URL likhein
+  optionsSuccessStatus: 200 
+};
+app.use(cors(corsOptions));
+// =============================
+
 app.use(express.json());
 
 const apiKey = process.env.GOOGLE_API_KEY;
@@ -96,6 +105,11 @@ const model = genAI.getGenerativeModel({
     }
 });
 
+// GET route to check if server is alive
+app.get('/', (req, res) => {
+    res.send('AI Agent Backend is running!');
+});
+
 app.post('/run-agent', async (req, res) => {
     const { goal } = req.body;
     if (!goal) return res.status(400).json({ error: 'Goal zaroori hai.' });
@@ -140,7 +154,10 @@ app.post('/run-agent', async (req, res) => {
     }
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`Backend server http://localhost:${PORT} par chal raha hai` );
+    console.log(`Backend server http://localhost:${PORT} par chal raha hai`);
 });
+
+// Export the app for Vercel
+module.exports = app;
