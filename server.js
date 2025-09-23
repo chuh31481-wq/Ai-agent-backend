@@ -1,7 +1,7 @@
 // backend/server.js
 
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); // CORS library ko import kiya
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -9,14 +9,14 @@ const tools = require('./tools.js');
 
 const app = express();
 
-// === YEH HAI AHEM TABDEELI ===
-// Hum server ko bata rahe hain ke sirf is URL se aane wali requests ko allow karna hai.
+// === YEH HAI AHEM TABDEELI (CORS FIX) ===
+// Hum server ko bata rahe hain ke sirf aapke frontend URL se aane wali requests ko allow karna hai.
 const corsOptions = {
-  origin: 'https://ai-agent-frontend.vercel.app', // <-- Yahan apna frontend ka URL likhein
+  origin: 'https://ai-agent-frontend-nine-omega.vercel.app', // Aapka frontend ka URL
   optionsSuccessStatus: 200 
 };
-app.use(cors(corsOptions));
-// =============================
+app.use(cors(corsOptions ));
+// =======================================
 
 app.use(express.json());
 
@@ -156,7 +156,7 @@ app.post('/run-agent', async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`Backend server http://localhost:${PORT} par chal raha hai`);
+    console.log(`Backend server http://localhost:${PORT} par chal raha hai`  );
 });
 
 // Export the app for Vercel
