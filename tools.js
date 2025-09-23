@@ -1,13 +1,11 @@
-// tools.js (FINAL SYNTAX-CORRECTED VERSION)
+// tools.js (FINAL VERSION with Wait Tool)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { Octokit } = require("@octokit/rest");
 
-// Root directory of the project
 const ROOT_DIR = process.cwd();
 
-// Helper function to create a safe file path within the project
 function getSafePath(fileName) {
     const absolutePath = path.resolve(ROOT_DIR, fileName);
     if (!absolutePath.startsWith(ROOT_DIR)) {
@@ -56,9 +54,7 @@ function executeCommand({ command, directory = '' }) {
 
 async function createGithubRepo({ repoName }) {
     const token = process.env.AGENT_GITHUB_TOKEN;
-    if (!token) {
-        return "Error: AGENT_GITHUB_TOKEN is not set in GitHub Secrets.";
-    }
+    if (!token) { return "Error: AGENT_GITHUB_TOKEN is not set."; }
     const octokit = new Octokit({ auth: token });
     try {
         const response = await octokit.repos.createForAuthenticatedUser({ name: repoName });
@@ -80,6 +76,14 @@ async function commitAndPushChanges({ commitMessage }) {
     return `Successfully committed and pushed changes with message: "${commitMessage}"`;
 }
 
+// === YEH HAI NAYI "SABR" WALI SUPERPOWER ===
+async function wait({ seconds }) {
+    console.log(`Waiting for ${seconds} seconds...`);
+    await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+    return `Successfully waited for ${seconds} seconds. Now retrying...`;
+}
+// ==========================================
+
 // Export all tools for Node.js
 module.exports = {
     createDirectory,
@@ -88,5 +92,6 @@ module.exports = {
     updateFile,
     executeCommand,
     createGithubRepo,
-    commitAndPushChanges
+    commitAndPushChanges,
+    wait // Naye tool ko export karein
 };
