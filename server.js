@@ -1,4 +1,4 @@
-// server.js (GitHub Actions Version)
+// server.js (GitHub Actions Version - FINAL FIX )
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -76,17 +76,5 @@ async function runAgent() {
 }
 
 runAgent();
-        }
-    } catch (error) {
-        console.error("[FATAL ERROR] Agent ko chalate waqt error:", error);
-        res.status(500).json({ error: 'Agent ko chalate waqt error aayi. Backend terminal check karein.' });
-    }
-});
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`Backend server http://localhost:${PORT} par chal raha hai`  );
-});
-
-// Export the app for Vercel
-module.exports = app;
+// YAHAN SE FALTU CODE HATA DIYA GAYA HAI
