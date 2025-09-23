@@ -1,0 +1,38 @@
+# .github/workflows/run-agent.yml
+
+name: 'Run AI Agent'
+
+# Yeh workflow kab chalega? Jab bhi koi naya "issue" banaya jaye.
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  run-agent-job:
+    # Yeh kaam ek Ubuntu (Linux) computer par chalega
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Hamara code is computer par download karo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Node.js (JavaScript chalane wala software) install karo
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Node.js ka version
+
+      # Step 3: Tamam zaroori libraries (dependencies) install karo
+      - name: Install dependencies
+        run: npm install
+
+      # Step 4: Agent ko run karo!
+      - name: Run the AI Agent
+        run: node server.js
+        env:
+          # Secrets ko istemal karo
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # "Issue" ke title ko "goal" ke taur par istemal karo
+          AGENT_GOAL: ${{ github.event.issue.title }}
