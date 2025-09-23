@@ -1,4 +1,4 @@
-// tools.js (FINAL "UNLEASHED" VERSION)
+// tools.js (FINAL SYNTAX-CORRECTED VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
@@ -9,10 +9,7 @@ const ROOT_DIR = process.cwd();
 
 // Helper function to create a safe file path within the project
 function getSafePath(fileName) {
-    // Resolve the path to make it absolute
     const absolutePath = path.resolve(ROOT_DIR, fileName);
-        
-    // Security Check: Ensure the path is still within the project directory
     if (!absolutePath.startsWith(ROOT_DIR)) {
         throw new Error(`Security Error: Attempted to access a path outside the project directory: ${fileName}`);
     }
@@ -27,7 +24,6 @@ async function createDirectory({ directoryName }) {
 
 async function createFile({ fileName, content }) {
     const filePath = getSafePath(fileName);
-    // Ensure parent directory exists before writing file
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content);
     return `File '${fileName}' created successfully.`;
@@ -46,7 +42,6 @@ async function updateFile({ fileName, newContent }) {
 }
 
 function executeCommand({ command, directory = '' }) {
-    // If directory is empty, use the root. Otherwise, use the specified directory.
     const execDir = directory ? getSafePath(directory) : ROOT_DIR;
     return new Promise((resolve) => {
         exec(command, { cwd: execDir }, (error, stdout, stderr) => {
@@ -94,11 +89,4 @@ module.exports = {
     executeCommand,
     createGithubRepo,
     commitAndPushChanges
-};
-    createFile,
-    readFile,
-    updateFile,
-    executeCommand,
-    createGithubRepo,
-    commitAndPushChanges // Naye tool ko yahan export karein
 };
