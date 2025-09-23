@@ -1,122 +1,93 @@
-// backend/tools.js
-
-const fs = require('fs/promises');
+// tools.js
+const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { Octokit } = require("@octokit/rest");
 
-const WORKSPACE_DIR = path.join(__dirname, 'agent-workspace');
+// Workspace directory, relative to the runner's workspace
+const WORKSPACE_DIR = path.resolve(process.cwd(), 'workspace');
 
-/**
- * Agent ke workspace mein ek naya folder (directory) banata hai.
- * @param {object} args - Jismein 'directoryName' property ho.
- */
-async function createDirectory(args) {
-    const { directoryName } = args;
-    if (!directoryName) return "Error: 'directoryName' zaroori hai.";
+async function ensureWorkspace() {
     try {
-        const dirPath = path.join(WORKSPACE_DIR, directoryName);
-        console.log(`TOOL ACTION: Directory "${dirPath}" bana raha hoon...`);
-        await fs.mkdir(dirPath, { recursive: true });
-        return `Kamyabi! Directory "${directoryName}" ban gayi hai.`;
+        await fs.access(WORKSPACE_DIR);
     } catch (error) {
-        return `Directory banane mein error aayi: ${error.message}`;
+        console.log("Workspace directory does not exist. Creating it.");
+        await fs.mkdir(WORKSPACE_DIR, { recursive: true });
     }
 }
 
-async function createFile(args) {
-    try {
-        const { fileName, content } = args;
-        if (!fileName || content === undefined) return "Error: 'fileName' aur 'content' dono zaroori hain.";
-        // Note: We are now creating the file inside the workspace, not a sub-directory
-        const filePath = path.join(WORKSPACE_DIR, fileName);
-        // Ensure the directory exists before writing the file
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        console.log(`TOOL ACTION: File "${filePath}" bana raha hoon...`);
-        await fs.writeFile(filePath, content);
-        return `Kamyabi! File "${fileName}" workspace mein ban gayi hai.`;
-    } catch (error) {
-        return `File banane mein error aayi: ${error.message}`;
+function getSafePath(fileName) {
+    const absolutePath = path.resolve(WORKSPACE_DIR, fileName);
+    if (!absolutePath.startsWith(WORKSPACE_DIR)) {
+        throw new Error(`Security Error: Attempted to access a path outside the workspace: ${fileName}`);
     }
+    return absolutePath;
 }
 
-async function readFile(args) {
-    try {
-        const { fileName } = args;
-        if (!fileName) return "Error: 'fileName' zaroori hai.";
-        const filePath = path.join(WORKSPACE_DIR, fileName);
-        console.log(`TOOL ACTION: File "${filePath}" ko parh raha hoon...`);
-        const content = await fs.readFile(filePath, 'utf-8');
-        return content;
-    } catch (error) {
-        if (error.code === 'ENOENT') return `Error: File "${args.fileName}" nahi mili.`;
-        return `File parhne mein error aayi: ${error.message}`;
-    }
+async function createDirectory({ directoryName }) {
+    await ensureWorkspace();
+    const dirPath = getSafePath(directoryName);
+    await fs.mkdir(dirPath, { recursive: true });
+    return `Directory '${directoryName}' created successfully inside workspace.`;
 }
 
-async function updateFile(args) {
-    try {
-        const { fileName, newContent } = args;
-        if (!fileName || newContent === undefined) return "Error: 'fileName' aur 'newContent' dono zaroori hain.";
-        const filePath = path.join(WORKSPACE_DIR, fileName);
-        console.log(`TOOL ACTION: File "${filePath}" ko update kar raha hoon...`);
-        await fs.writeFile(filePath, newContent);
-        return `Kamyabi! File "${fileName}" update ho gayi hai.`;
-    } catch (error) {
-        if (error.code === 'ENOENT') return `Error: File "${args.fileName}" nahi mili, isliye update nahi kar sakta.`;
-        return `File update karne mein error aayi: ${error.message}`;
-    }
+async function createFile({ fileName, content }) {
+    await ensureWorkspace();
+    const filePath = getSafePath(fileName);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, content);
+    return `File '${fileName}' created successfully inside workspace.`;
 }
 
-async function executeCommand(args) {
-    const { command, directory } = args;
-    if (!command) return "Error: 'command' zaroori hai.";
-    
-    // Command ko ya to specific directory mein ya workspace mein chalayein
-    const execPath = directory ? path.join(WORKSPACE_DIR, directory) : WORKSPACE_DIR;
+async function readFile({ fileName }) {
+    await ensureWorkspace();
+    const filePath = getSafePath(fileName);
+    const fileContent = await fs.readFile(filePath, 'utf-8');
+    return fileContent;
+}
 
-    console.log(`TOOL ACTION: Command chala raha hoon: "${command}" in "${execPath}"`);
+async function updateFile({ fileName, newContent }) {
+    await ensureWorkspace();
+    const filePath = getSafePath(fileName);
+    await fs.writeFile(filePath, newContent);
+    return `File '${fileName}' updated successfully.`;
+}
+
+async function executeCommand({ command, directory = '' }) {
+    await ensureWorkspace();
+    const execDir = getSafePath(directory);
     return new Promise((resolve) => {
-        exec(command, { cwd: execPath }, (error, stdout, stderr) => {
+        exec(command, { cwd: execDir }, (error, stdout, stderr) => {
             if (error) {
-                console.error(`Command error: ${error.message}`);
-                resolve(`Command fail ho gayi: ${error.message}`);
-                return;
+                resolve(`Execution Error: ${error.message}\nStderr: ${stderr}`);
+            } else {
+                resolve(`Command Output:\n${stdout}`);
             }
-            if (stderr) {
-                console.log(`Command stderr: ${stderr}`);
-                resolve(`Command ne yeh output diya (stderr): ${stderr}`);
-                return;
-            }
-            console.log(`Command output: ${stdout}`);
-            resolve(`Command kamyabi se chali. Output:\n${stdout}`);
         });
     });
 }
 
-async function createGithubRepo(args) {
-    const { repoName } = args;
-    if (!repoName) return "Error: 'repoName' zaroori hai.";
+async function createGithubRepo({ repoName }) {
+    // Secret ka naya naam istemal karein
+    const token = process.env.AGENT_GITHUB_TOKEN;
+    if (!token) {
+        return "Error: AGENT_GITHUB_TOKEN is not set in GitHub Secrets.";
+    }
+    const octokit = new Octokit({ auth: token });
     try {
-        const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-        console.log(`TOOL ACTION: GitHub repo "${repoName}" bana raha hoon...`);
-        const response = await octokit.repos.createForAuthenticatedUser({
-            name: repoName,
-            private: false,
-        });
-        const repoUrl = response.data.html_url;
-        return `Kamyabi! GitHub repository "${repoName}" ban gayi hai. Aap isay yahan dekh sakte hain: ${repoUrl}`;
+        const response = await octokit.repos.createForAuthenticatedUser({ name: repoName });
+        return `Successfully created repository: ${response.data.html_url}`;
     } catch (error) {
-        console.error(`GitHub repo banane mein error: ${error.message}`);
-        return `GitHub repo banane mein error aayi: ${error.message}`;
+        return `Error creating repository: ${error.message}`;
     }
 }
 
+// Node.js ke liye sahi tareeqe se export karein
 module.exports = {
     createDirectory,
     createFile,
     readFile,
     updateFile,
     executeCommand,
-    createGithubRepo,
+    createGithubRepo
 };
