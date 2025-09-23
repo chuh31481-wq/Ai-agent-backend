@@ -1,4 +1,4 @@
-# .github/workflows/run-agent.yml (FINAL VERSION with Write Permissions)
+# .github/workflows/run-agent.yml (FINAL UPGRADED VERSION)
 
 name: 'Run AI Agent'
 
@@ -6,39 +6,34 @@ on:
   issues:
     types: [opened]
 
-# === YEH HAI NAYI TABDEELI ===
-# Hum Action ko is repository mein code likhne (push karne) ki ijazat de rahe hain.
 permissions:
   contents: write
-  issues: read
-# ============================
+  issues: read # 'issues: read' zaroori hai taake body parh sakein
 
 jobs:
   run-agent-job:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Hamara code is computer par download karo
-      # Is baar, hum 'token' ke liye apna AGENT_GITHUB_TOKEN istemal karenge taake push ho sake
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.AGENT_GITHUB_TOKEN }}
 
-      # Step 2: Node.js (JavaScript chalane wala software) install karo
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # Step 3: Tamam zaroori libraries (dependencies) install karo
       - name: Install dependencies
         run: npm install
 
-      # Step 4: Agent ko run karo!
       - name: Run the AI Agent
         run: node server.js
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           AGENT_GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
-          AGENT_GOAL: ${{ github.event.issue.title }}
+          # === YEH HAI NAYI AUR BEHTAR TABDEELI ===
+          # Ab "goal" ko issue ki body (description) se uthao
+          AGENT_GOAL: ${{ github.event.issue.body }}
+          # =======================================
