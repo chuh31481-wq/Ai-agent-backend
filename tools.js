@@ -1,59 +1,53 @@
-// tools.js (FINAL VERSION with Commit & Push tool)
+// tools.js (FINAL "UNLEASHED" VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { Octokit } = require("@octokit/rest");
 
-const WORKSPACE_DIR = path.resolve(process.cwd(), 'workspace');
+// Root directory of the project
+const ROOT_DIR = process.cwd();
 
-async function ensureWorkspace() {
-    try {
-        await fs.access(WORKSPACE_DIR);
-    } catch (error) {
-        console.log("Workspace directory does not exist. Creating it.");
-        await fs.mkdir(WORKSPACE_DIR, { recursive: true });
-    }
-}
-
+// Helper function to create a safe file path within the project
 function getSafePath(fileName) {
-    const absolutePath = path.resolve(WORKSPACE_DIR, fileName);
-    if (!absolutePath.startsWith(WORKSPACE_DIR)) {
-        throw new Error(`Security Error: Attempted to access a path outside the workspace: ${fileName}`);
+    // Resolve the path to make it absolute
+    const absolutePath = path.resolve(ROOT_DIR, fileName);
+        
+    // Security Check: Ensure the path is still within the project directory
+    if (!absolutePath.startsWith(ROOT_DIR)) {
+        throw new Error(`Security Error: Attempted to access a path outside the project directory: ${fileName}`);
     }
     return absolutePath;
 }
 
 async function createDirectory({ directoryName }) {
-    await ensureWorkspace();
     const dirPath = getSafePath(directoryName);
     await fs.mkdir(dirPath, { recursive: true });
-    return `Directory '${directoryName}' created successfully inside workspace.`;
+    return `Directory '${directoryName}' created successfully.`;
 }
 
 async function createFile({ fileName, content }) {
-    await ensureWorkspace();
     const filePath = getSafePath(fileName);
+    // Ensure parent directory exists before writing file
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content);
-    return `File '${fileName}' created successfully inside workspace.`;
+    return `File '${fileName}' created successfully.`;
 }
 
 async function readFile({ fileName }) {
-    await ensureWorkspace();
     const filePath = getSafePath(fileName);
     const fileContent = await fs.readFile(filePath, 'utf-8');
     return fileContent;
 }
 
 async function updateFile({ fileName, newContent }) {
-    await ensureWorkspace();
     const filePath = getSafePath(fileName);
     await fs.writeFile(filePath, newContent);
     return `File '${fileName}' updated successfully.`;
 }
 
 function executeCommand({ command, directory = '' }) {
-    const execDir = directory ? getSafePath(directory) : process.cwd();
+    // If directory is empty, use the root. Otherwise, use the specified directory.
+    const execDir = directory ? getSafePath(directory) : ROOT_DIR;
     return new Promise((resolve) => {
         exec(command, { cwd: execDir }, (error, stdout, stderr) => {
             if (error) {
@@ -79,36 +73,28 @@ async function createGithubRepo({ repoName }) {
     }
 }
 
-// === YEH HAI NAYI SUPERPOWER KA CODE ===
 async function commitAndPushChanges({ commitMessage }) {
-    console.log("Configuring Git user for the commit...");
     await executeCommand({ command: 'git config --global user.name "AI Agent"' });
     await executeCommand({ command: 'git config --global user.email "ai-agent@users.noreply.github.com"' });
-
-    console.log("Adding changes to Git staging area...");
-    const addResult = await executeCommand({ command: 'git add .' });
-    console.log(addResult);
-
-    console.log("Committing changes...");
-    // Use single quotes to handle commit messages with special characters
+    await executeCommand({ command: 'git add .' });
     const commitResult = await executeCommand({ command: `git commit -m '${commitMessage}'` });
-    console.log(commitResult);
-
     if (commitResult.includes("nothing to commit")) {
         return "No changes were detected to commit.";
     }
-
-    console.log("Pushing changes to the main branch on GitHub...");
-    const pushResult = await executeCommand({ command: 'git push origin main' });
-    console.log(pushResult);
-
+    await executeCommand({ command: 'git push origin main' });
     return `Successfully committed and pushed changes with message: "${commitMessage}"`;
 }
-// =====================================
 
-// Node.js ke liye sab tools ko export karein
+// Export all tools for Node.js
 module.exports = {
     createDirectory,
+    createFile,
+    readFile,
+    updateFile,
+    executeCommand,
+    createGithubRepo,
+    commitAndPushChanges
+};
     createFile,
     readFile,
     updateFile,
