@@ -1,4 +1,4 @@
-# .github/workflows/run-agent.yml
+# .github/workflows/run-agent.yml (FINAL CORRECTED VERSION)
 
 name: 'Run AI Agent'
 
@@ -33,6 +33,7 @@ jobs:
         env:
           # Secrets ko istemal karo
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGENT_GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }} # <-- YEH HAI SAHI NAAM
+              
           # "Issue" ke title ko "goal" ke taur par istemal karo
           AGENT_GOAL: ${{ github.event.issue.title }}
