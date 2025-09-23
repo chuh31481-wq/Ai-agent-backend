@@ -44,7 +44,7 @@ async function runAgent() {
     const history = [{ role: "user", parts: [{ text: goal }] }];
     let safetyLoop = 0;
 
-    while (safetyLoop < 10) {
+    while (safetyLoop < 20) {
         safetyLoop++;
         const result = await model.generateContent({ contents: history });
         const response = result.response;
