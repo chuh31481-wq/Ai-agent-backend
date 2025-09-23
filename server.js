@@ -1,4 +1,4 @@
-// server.js (GitHub Actions Version - FINAL FIX )
+// server.js (GitHub Actions Version - FINAL FIX)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
