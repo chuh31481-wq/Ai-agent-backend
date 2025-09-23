@@ -1,4 +1,4 @@
-// server.js (GitHub Actions Version - FINAL FIX)
+// server.js (FINAL VERSION with Commit & Push tool)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -7,7 +7,7 @@ const goal = process.env.AGENT_GOAL;
 
 if (!goal) {
     console.log("AGENT_GOAL environment variable not found. This script is designed to be run from a GitHub Action triggered by an issue.");
-    process.exit(0); // Khamoshi se band ho jao
+    process.exit(0);
 }
 
 const apiKey = process.env.GOOGLE_API_KEY;
@@ -18,14 +18,27 @@ if (!apiKey) {
 
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// Gemini ke liye tools ki list banayein
+// Gemini ke liye tools ki mukammal list
 const functionDeclarations = [
     { name: "createDirectory", description: "Creates a new, empty directory in the workspace.", parameters: { type: "object", properties: { directoryName: { type: "string" } }, required: ["directoryName"] } },
     { name: "createFile", description: "Creates a file with specified content.", parameters: { type: "object", properties: { fileName: { type: "string" }, content: { type: "string" } }, required: ["fileName", "content"] } },
     { name: "readFile", description: "Reads the content of a file.", parameters: { type: "object", properties: { fileName: { type: "string" } }, required: ["fileName"] } },
     { name: "updateFile", description: "Updates the content of a file.", parameters: { type: "object", properties: { fileName: { type: "string" }, newContent: { type: "string" } }, required: ["fileName", "newContent"] } },
     { name: "executeCommand", description: "Executes a shell command.", parameters: { type: "object", properties: { command: { type: "string" }, directory: { type: "string" } }, required: ["command"] } },
-    { name: "createGithubRepo", description: "Creates a new public GitHub repository.", parameters: { type: "object", properties: { repoName: { type: "string" } }, required: ["repoName"] } }
+    { name: "createGithubRepo", description: "Creates a new public GitHub repository.", parameters: { type: "object", properties: { repoName: { type: "string" } }, required: ["repoName"] } },
+    // === YEH HAI NAYE TOOL KI INFORMATION ===
+    {
+        name: "commitAndPushChanges",
+        description: "Commits all new or modified files in the workspace to the GitHub repository and pushes them. This should be the final step after creating or modifying files.",
+        parameters: {
+            type: "object",
+            properties: {
+                commitMessage: { type: "string", description: "A descriptive message for the commit, explaining what was changed." }
+            },
+            required: ["commitMessage"]
+        }
+    }
+    // =====================================
 ];
 
 const model = genAI.getGenerativeModel({
@@ -76,5 +89,3 @@ async function runAgent() {
 }
 
 runAgent();
-
-// YAHAN SE FALTU CODE HATA DIYA GAYA HAI
