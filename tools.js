@@ -1,11 +1,11 @@
-// tools.js (FINAL LEARNING AGENT VERSION)
+// tools.js (FINAL, COMPLETE, AND FLEXIBLE VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { Octokit } = require("@octokit/rest");
 
 const ROOT_DIR = process.cwd();
-const LOG_FILE = path.join(ROOT_DIR, 'agent_log.json'); // Hamari nayi "Diary"
+const LOG_FILE = path.join(ROOT_DIR, 'agent_log.json');
 
 // Helper function to create a safe file path within the project
 function getSafePath(fileName) {
@@ -23,12 +23,22 @@ async function createDirectory({ directoryName }) {
     return `Directory '${directoryName}' created successfully.`;
 }
 
-async function createFile({ fileName, content }) {
+// === FLEXIBLE createFile FUNCTION ===
+async function createFile(args) {
+    // AI kabhi 'fileName' bhejta hai, kabhi 'file_name'. Hum dono ko handle karenge.
+    const fileName = args.fileName || args.file_name;
+    const content = args.content;
+
+    if (!fileName) {
+        return "Error: You must provide a file name (fileName or file_name).";
+    }
+
     const filePath = getSafePath(fileName);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, content);
+    await fs.writeFile(filePath, content || ''); // Agar content na ho to khali file banao
     return `File '${fileName}' created successfully.`;
 }
+// =================================
 
 async function readFile({ fileName }) {
     const filePath = getSafePath(fileName);
@@ -36,9 +46,16 @@ async function readFile({ fileName }) {
     return fileContent;
 }
 
-async function updateFile({ fileName, newContent }) {
+async function updateFile(args) {
+    const fileName = args.fileName || args.file_name;
+    const newContent = args.newContent || args.content;
+
+    if (!fileName) {
+        return "Error: You must provide a file name (fileName or file_name).";
+    }
+
     const filePath = getSafePath(fileName);
-    await fs.writeFile(filePath, newContent);
+    await fs.writeFile(filePath, newContent || '');
     return `File '${fileName}' updated successfully.`;
 }
 
@@ -88,20 +105,16 @@ async function wait({ seconds }) {
     return `Successfully waited for ${seconds} seconds.`;
 }
 
-// === YEH HAI NAYI "LEARNING" WALI SUPERPOWER ===
+// === NAYI "LEARNING" WALI SUPERPOWER ===
 async function logMission({ missionData }) {
     let logs = [];
     try {
         const data = await fs.readFile(LOG_FILE, 'utf-8');
         logs = JSON.parse(data);
     } catch (e) {
-        // Agar file nahi hai, to khali array se shuru karein
         console.log("Log file not found, creating a new one.");
     }
-    
-    // Naye mission ka data diary mein add karo
     logs.push(JSON.parse(missionData));
-    
     await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2));
     return `Successfully logged the mission. The agent now has a new experience.`;
 }
@@ -117,5 +130,5 @@ module.exports = {
     createGithubRepo,
     commitAndPushChanges,
     wait,
-    logMission // Hamara naya aur wahid memory tool
+    logMission
 };
