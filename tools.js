@@ -1,11 +1,11 @@
-// tools.js (FINAL, COMPLETE, AND FULLY-FUNCTIONAL VERSION)
+// tools.js (FINAL LEARNING AGENT VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { Octokit } = require("@octokit/rest");
 
 const ROOT_DIR = process.cwd();
-const MEMORY_FILE = path.join(ROOT_DIR, 'memory.json');
+const LOG_FILE = path.join(ROOT_DIR, 'agent_log.json'); // Hamari nayi "Diary"
 
 // Helper function to create a safe file path within the project
 function getSafePath(fileName) {
@@ -16,7 +16,7 @@ function getSafePath(fileName) {
     return absolutePath;
 }
 
-// --- Tamam Asal Tools ---
+// --- Tamam Zaroori Tools ---
 async function createDirectory({ directoryName }) {
     const dirPath = getSafePath(directoryName);
     await fs.mkdir(dirPath, { recursive: true });
@@ -77,7 +77,7 @@ async function commitAndPushChanges({ commitMessage }) {
     }
     const pushResult = await executeCommand({ command: 'git push origin main' });
     if (pushResult.includes("Execution Error")) {
-        return pushResult; // Push fail hone par error wapas bhejein
+        return pushResult;
     }
     return `Successfully committed and pushed changes with message: "${commitMessage}"`;
 }
@@ -88,18 +88,24 @@ async function wait({ seconds }) {
     return `Successfully waited for ${seconds} seconds.`;
 }
 
-async function remember({ key, value }) {
-    let memory = {};
+// === YEH HAI NAYI "LEARNING" WALI SUPERPOWER ===
+async function logMission({ missionData }) {
+    let logs = [];
     try {
-        const data = await fs.readFile(MEMORY_FILE, 'utf-8');
-        memory = JSON.parse(data);
+        const data = await fs.readFile(LOG_FILE, 'utf-8');
+        logs = JSON.parse(data);
     } catch (e) {
-        console.log("Memory file not found, creating a new one.");
+        // Agar file nahi hai, to khali array se shuru karein
+        console.log("Log file not found, creating a new one.");
     }
-    memory[key] = value;
-    await fs.writeFile(MEMORY_FILE, JSON.stringify(memory, null, 2));
-    return `Successfully remembered the value for key: '${key}'.`;
+    
+    // Naye mission ka data diary mein add karo
+    logs.push(JSON.parse(missionData));
+    
+    await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2));
+    return `Successfully logged the mission. The agent now has a new experience.`;
 }
+// ==========================================
 
 // Export all tools for Node.js
 module.exports = {
@@ -111,5 +117,5 @@ module.exports = {
     createGithubRepo,
     commitAndPushChanges,
     wait,
-    remember
+    logMission // Hamara naya aur wahid memory tool
 };
