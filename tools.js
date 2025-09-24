@@ -1,4 +1,4 @@
-// tools.js (FINAL, COMPLETE, AND FULLY FLEXIBLE VERSION)
+// tools.js (FINAL, COMPLETE, AND STANDARDIZED VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
@@ -15,12 +15,11 @@ function getSafePath(fileName) {
     return absolutePath;
 }
 
-// --- Tamam Flexible Tools ---
+// --- Tamam Standardized Tools ---
 
 async function createDirectory(args) {
     const directoryName = args.directoryName || args.path || args.name;
-    if (!directoryName) { return "Error: You must provide a directory name (directoryName, path, or name)."; }
-    
+    if (!directoryName) { return "Error: You must provide a directory name."; }
     const dirPath = getSafePath(directoryName);
     await fs.mkdir(dirPath, { recursive: true });
     return `Directory '${directoryName}' created successfully.`;
@@ -29,8 +28,7 @@ async function createDirectory(args) {
 async function createFile(args) {
     const fileName = args.fileName || args.file_name || args.name;
     const content = args.content;
-    if (!fileName) { return "Error: You must provide a file name (fileName, file_name, or name)."; }
-
+    if (!fileName) { return "Error: You must provide a file name."; }
     const filePath = getSafePath(fileName);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content || '');
@@ -40,17 +38,14 @@ async function createFile(args) {
 async function readFile(args) {
     const fileName = args.fileName || args.file_name || args.path;
     if (!fileName) { return "Error: You must provide a file name to read."; }
-
     const filePath = getSafePath(fileName);
-    const fileContent = await fs.readFile(filePath, 'utf-8');
-    return fileContent;
+    return await fs.readFile(filePath, 'utf-8');
 }
 
 async function updateFile(args) {
     const fileName = args.fileName || args.file_name || args.path;
     const newContent = args.newContent || args.content;
     if (!fileName) { return "Error: You must provide a file name to update."; }
-
     const filePath = getSafePath(fileName);
     await fs.writeFile(filePath, newContent || '');
     return `File '${fileName}' updated successfully.`;
@@ -58,9 +53,8 @@ async function updateFile(args) {
 
 function executeCommand(args) {
     const command = args.command;
+    if (!command) { return Promise.resolve("Error: You must provide a command to execute."); }
     const directory = args.directory || '';
-    if (!command) { return "Error: You must provide a command to execute."; }
-
     const execDir = directory ? getSafePath(directory) : ROOT_DIR;
     return new Promise((resolve) => {
         exec(command, { cwd: execDir }, (error, stdout, stderr) => {
@@ -76,7 +70,6 @@ function executeCommand(args) {
 async function createGithubRepo(args) {
     const repoName = args.repoName || args.name;
     if (!repoName) { return "Error: You must provide a repository name."; }
-
     const token = process.env.AGENT_GITHUB_TOKEN;
     if (!token) { return "Error: AGENT_GITHUB_TOKEN is not set."; }
     const octokit = new Octokit({ auth: token });
@@ -91,7 +84,6 @@ async function createGithubRepo(args) {
 async function commitAndPushChanges(args) {
     const commitMessage = args.commitMessage || args.message;
     if (!commitMessage) { return "Error: You must provide a commit message."; }
-
     await executeCommand({ command: 'git config --global user.name "AI Agent"' });
     await executeCommand({ command: 'git config --global user.email "ai-agent@users.noreply.github.com"' });
     await executeCommand({ command: 'git add .' });
@@ -116,12 +108,14 @@ async function wait({ seconds }) {
 async function logMission({ missionData }) {
     let logs = [];
     try {
-        const data = await fs.readFile({ fileName: LOG_FILE });
+        // Yahan 'readFile' tool ko direct call karne ke bajaye, fs.readFile istemal karein
+        const data = await fs.readFile(LOG_FILE, 'utf-8');
         logs = JSON.parse(data);
     } catch (e) {
         console.log("Log file not found, creating a new one.");
     }
-    logs.push(JSON.parse(missionData));
+    // Yahan JSON.parse() ki zaroorat nahi, kyunke AI ab seedha object bhejega
+    logs.push(missionData);
     await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2));
     return `Successfully logged the mission.`;
 }
