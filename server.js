@@ -1,4 +1,4 @@
-// server.js (FINAL FOCUSED AGENT VERSION)
+// server.js (FINAL, SIMPLE, AND RELIABLE VERSION)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -15,21 +15,27 @@ let currentKeyIndex = 0;
 
 if (!goal) { console.log("AGENT_GOAL not found."); process.exit(0); }
 
-const toolConfig = { /* ... (toolConfig waisa hi hai, pichle code se copy karein) ... */ };
+const toolConfig = {
+    functionDeclarations: [
+        { name: "createDirectory", description: "Creates a directory." },
+        { name: "createFile", description: "Creates a file with content." },
+        { name: "readFile", description: "Reads a file's content." },
+        { name: "updateFile", description: "Updates a file's content." },
+        { name: "executeCommand", description: "Executes a shell command." },
+        { name: "createGithubRepo", description: "Creates a new GitHub repository." },
+        { name: "commitAndPushChanges", description: "Commits and pushes all changes to the repository." },
+        { name: "wait", description: "Pauses execution for a number of seconds." },
+        { name: "logMission", description: "Logs the result of a completed mission to the agent's long-term memory.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } }
+    ]
+};
 
 async function runAgent() {
-    let previousLogs = "No previous missions found.";
-    try {
-        const logData = await tools.readFile({ fileName: LOG_FILE });
-        const parsedLogs = JSON.parse(logData);
-        const recentLogs = parsedLogs.slice(-5);
-        previousLogs = `Here are summaries of your last 5 missions:\n${JSON.stringify(recentLogs, null, 2)}`;
-    } catch (error) { console.log("Log file not found. This is the first mission."); }
-
-    const initialPrompt = `User's Goal: "${goal}"\n\nBased on your past experiences below, create a step-by-step plan and start with the first step.\n\nPast Experiences:\n${previousLogs}`;
-    const history = [{ role: "user", parts: [{ text: initialPrompt }] }];
+    // Bilkul saada history, jaisa shuru mein tha
+    const history = [{ role: "user", parts: [{ text: goal }] }];
     const stepsTaken = [];
     let safetyLoop = 0;
+
+    console.log(`\n[STARTING AGENT] New Goal: "${goal}"`);
 
     while (safetyLoop < 30) {
         safetyLoop++;
@@ -37,7 +43,7 @@ async function runAgent() {
             const apiKey = apiKeys[currentKeyIndex];
             console.log(`\n--- Agent's Turn (Step ${safetyLoop}) --- Using Key #${currentKeyIndex + 1}`);
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", tools: toolConfig, systemInstruction: "You are a methodical AI agent..." });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", tools: toolConfig });
 
             const result = await model.generateContent({ contents: history });
             const response = result.response;
@@ -48,39 +54,40 @@ async function runAgent() {
             if (call) {
                 console.log(`\n⚙️ [AI DECISION] Calling tool: ${call.name} with arguments:`, call.args);
                 stepsTaken.push({ step: safetyLoop, tool: call.name, args: call.args });
-                
-                // === YEH HAI NAYI, FOCUSED HIDAYAT ===
-                // Hum purani history ko saaf karke, sirf zaroori cheezein bhejenge
-                const newHistory = [
-                    { role: "user", parts: [{ text: initialPrompt }] }, // Asal goal hamesha yaad rahe
-                    { role: "model", parts: [{ functionCall: call }] } // Sirf mojooda faisla
-                ];
-                // =====================================
+                history.push({ role: "model", parts: [{ functionCall: call }] });
 
                 if (tools[call.name]) {
                     const toolResult = await tools[call.name](call.args);
                     console.log(`Tool Output: ${String(toolResult).substring(0, 300)}...`);
-                    newHistory.push({ role: "function", parts: [{ functionResponse: { name: call.name, response: { content: String(toolResult) } } }] });
-                    
-                    // Agent ko agla qadam sochne ke liye "majboor" karein
-                    newHistory.push({ role: "user", parts: [{ text: "That step is complete. Based on the original goal and the result of the last tool call, what is the next single tool to call?" }] });
-                    
-                    history.splice(0, history.length, ...newHistory); // Purani history ko nayi, focused history se badal do
-
-                    if (call.name === 'logMission') {
-                        console.log("\n✅ [MISSION LOGGED]");
-                        await tools.commitAndPushChanges({ commitMessage: `log: Update agent log` });
-                        console.log("🏁 [AGENT FINISHED]");
-                        return;
-                    }
-                } else { throw new Error(`AI tried to call a non-existent tool: '${call.name}'`); }
-            } else { throw new Error("Agent got stuck and did not produce a tool call."); }
+                    history.push({ role: "function", parts: [{ functionResponse: { name: call.name, response: { content: String(toolResult) } } }] });
+                } else {
+                    throw new Error(`AI tried to call a non-existent tool: '${call.name}'`);
+                }
+            } else {
+                // Agar AI ne tool call nahi kiya, to iska matlab hai mission poora ho gaya hai
+                console.log("\n✅ [FINAL RESPONSE] Mission complete. Final response from AI:");
+                console.log(response.text());
+                console.log("🏁 [AGENT FINISHED]");
+                return;
+            }
 
         } catch (error) {
-            // ... (Error handling ka logic bilkul waisa hi rahega) ...
+            console.error(`❌ [ERROR] ${error.message}`);
+            if (error.message && (error.message.includes("429") || error.message.includes("quota"))) {
+                console.log("Rate limit detected. Switching to the next API key.");
+                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+                if (currentKeyIndex === 0) {
+                    console.error("All API keys exhausted. Waiting for 60 seconds.");
+                    await tools.wait({ seconds: 60 });
+                }
+                continue;
+            } else {
+                console.error("An unrecoverable error occurred. Stopping agent.");
+                return;
+            }
         }
     }
-    // ... (Timeout handling ka logic bilkul waisa hi rahega) ...
+    console.error("❌ Agent exceeded maximum steps. Stopping.");
 }
 
 runAgent();
