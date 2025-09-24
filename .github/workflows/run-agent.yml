@@ -1,49 +1,47 @@
-# .github/workflows/run-agent.yml (FINAL OPENROUTER VERSION)
+# .github/workflows/run-agent.yml (FINAL, PERFECTED, GOOGLE MULTI-KEY)
 
 name: 'Run AI Agent'
 
-# Yeh workflow kab chalega? Jab bhi koi naya "issue" banaya jaye.
 on:
   issues:
     types: [opened]
 
-# Action ko repository mein code likhne (push karne) ki ijazat do.
 permissions:
   contents: write
   issues: read
 
 jobs:
   run-agent-job:
-    # Yeh kaam ek Ubuntu (Linux) computer par chalega
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Hamara code is computer par download karo
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.AGENT_GITHUB_TOKEN }}
 
-      # Step 2: Node.js (JavaScript chalane wala software) install karo
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Node.js ka version
+          node-version: '20'
 
-      # Step 3: Tamam zaroori libraries (dependencies) install karo
       - name: Install dependencies
         run: npm install
 
-      # Step 4: Agent ko run karo!
       - name: Run the AI Agent
         run: node server.js
         env:
-          # === YEH HAI NAYA, SAHI ENV SECTION ===
-          # Sirf OpenRouter ki key istemal karo
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # === GOOGLE MULTI-KEY ENV ===
+          GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+          GEMINI_API_KEY_5: ${{ secrets.GEMINI_API_KEY_5 }}
+          GEMINI_API_KEY_6: ${{ secrets.GEMINI_API_KEY_6 }}
+          GEMINI_API_KEY_7: ${{ secrets.GEMINI_API_KEY_7 }}
+          GEMINI_API_KEY_8: ${{ secrets.GEMINI_API_KEY_8 }}
+          GEMINI_API_KEY_9: ${{ secrets.GEMINI_API_KEY_9 }}
+          GEMINI_API_KEY_10: ${{ secrets.GEMINI_API_KEY_10 }}
           
-          # GitHub token (repo create/push karne ke liye)
           AGENT_GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
-          
-          # Goal ko issue ki body (description) se uthao
           AGENT_GOAL: ${{ github.event.issue.body }}
