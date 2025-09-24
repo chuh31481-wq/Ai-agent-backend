@@ -1,4 +1,4 @@
-// server.js (FINAL, RELIABLE, AND LEARNING AGENT)
+// server.js (FINAL, SIMPLE, AND RELIABLE VERSION)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -30,19 +30,8 @@ const toolConfig = {
 };
 
 async function runAgent() {
-    // === YEH HAI NAYI, BEHTAR HIDAYAT ===
-    const initialPrompt = `
-    User's Goal: "${goal}"
-    
-    Based on this goal, create a step-by-step plan. Execute the plan by calling the necessary tools.
-    After all other steps are complete, your final step MUST be to call the 'logMission' tool to record your work.
-    For the 'logMission' tool, provide a JSON string with 'goal', 'outcome', and 'learnings'.
-    
-    Now, begin. What is the first tool call?
-    `;
-    // ===================================
-
-    const history = [{ role: "user", parts: [{ text: initialPrompt }] }];
+    // Bilkul saada history, jaisa shuru mein tha
+    const history = [{ role: "user", parts: [{ text: goal }] }];
     const stepsTaken = [];
     let safetyLoop = 0;
 
@@ -64,35 +53,41 @@ async function runAgent() {
 
             if (call) {
                 console.log(`\n⚙️ [AI DECISION] Calling tool: ${call.name} with arguments:`, call.args);
-                stepsTaken.push({ step: safetyLoop, tool: call.name });
+                stepsTaken.push({ step: safetyLoop, tool: call.name, args: call.args });
                 history.push({ role: "model", parts: [{ functionCall: call }] });
 
                 if (tools[call.name]) {
                     const toolResult = await tools[call.name](call.args);
                     console.log(`Tool Output: ${String(toolResult).substring(0, 300)}...`);
                     history.push({ role: "function", parts: [{ functionResponse: { name: call.name, response: { content: String(toolResult) } } }] });
-
-                    // Agar agent ne apna kaam yaad rakh liya hai, to mission poora ho gaya
-                    if (call.name === 'logMission') {
-                        console.log("\n✅ [MISSION LOGGED] Agent has saved its experience.");
-                        await tools.commitAndPushChanges({ commitMessage: `log: Update agent log` });
-                        console.log("🏁 [AGENT FINISHED]");
-                        return;
-                    }
                 } else {
                     throw new Error(`AI tried to call a non-existent tool: '${call.name}'`);
                 }
             } else {
-                // Agar AI ne tool call nahi kiya, to iska matlab hai woh phans gaya hai.
-                console.log("\n⚠️ [AI STUCK] Agent did not call a tool. Forcing it to log its failure.");
-                throw new Error("Agent got stuck and did not produce a tool call.");
+                // Agar AI ne tool call nahi kiya, to iska matlab hai mission poora ho gaya hai
+                console.log("\n✅ [FINAL RESPONSE] Mission complete. Final response from AI:");
+                console.log(response.text());
+                console.log("🏁 [AGENT FINISHED]");
+                return;
             }
 
         } catch (error) {
-            // ... (Error handling ka logic bilkul waisa hi rahega, jo aakhir mein logMission call karega) ...
+            console.error(`❌ [ERROR] ${error.message}`);
+            if (error.message && (error.message.includes("429") || error.message.includes("quota"))) {
+                console.log("Rate limit detected. Switching to the next API key.");
+                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+                if (currentKeyIndex === 0) {
+                    console.error("All API keys exhausted. Waiting for 60 seconds.");
+                    await tools.wait({ seconds: 60 });
+                }
+                continue;
+            } else {
+                console.error("An unrecoverable error occurred. Stopping agent.");
+                return;
+            }
         }
     }
-    // ... (Timeout handling ka logic bilkul waisa hi rahega, jo aakhir mein logMission call karega) ...
+    console.error("❌ Agent exceeded maximum steps. Stopping.");
 }
 
 runAgent();
