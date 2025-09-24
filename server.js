@@ -1,4 +1,4 @@
-// server.js (FINAL LEARNING AGENT VERSION)
+// server.js (FINAL, CORRECTED, MULTI-KEY LEARNING AGENT)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -35,7 +35,7 @@ const toolConfig = {
         { name: "createGithubRepo", description: "Creates a new GitHub repository." },
         { name: "commitAndPushChanges", description: "Commits and pushes all changes to the repository." },
         { name: "wait", description: "Pauses execution for a number of seconds." },
-        { name: "logMission", description: "Logs the result of a completed mission to the agent's long-term memory.", parameters: { type: "object", properties: { missionData: { type: "string", description: "A JSON string detailing the mission's goal, steps, outcome, and learnings." } }, required: ["missionData"] } }
+        { name: "logMission", description: "Logs the result of a completed mission to the agent's long-term memory.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } }
     ]
 };
 
@@ -43,29 +43,18 @@ async function runAgent() {
     let previousLogs = "No previous missions found.";
     try {
         const logData = await tools.readFile({ fileName: LOG_FILE });
-        // Sirf aakhri 5 missions ka data bhejein taake prompt lamba na ho
         const parsedLogs = JSON.parse(logData);
         const recentLogs = parsedLogs.slice(-5);
-        previousLogs = `Here are summaries of your last 5 missions. Use them to make better decisions:\n${JSON.stringify(recentLogs, null, 2)}`;
+        previousLogs = `Here are summaries of your last 5 missions:\n${JSON.stringify(recentLogs, null, 2)}`;
     } catch (error) {
         console.log("Log file not found. This is the first mission.");
     }
 
-    const initialPrompt = `
-    Based on your past experiences below, create a step-by-step plan to achieve the user's goal. Your final step must always be to call 'logMission'.
-
-    Past Experiences:
-    ${previousLogs}
-
-    User's New Goal: "${goal}"
-
-    Now, begin. What is the first tool you will call to achieve this goal?
-    `;
-
+    const initialPrompt = `Based on your past experiences below, create a step-by-step plan to achieve the user's goal. Your final step must always be to call 'logMission'.\n\nPast Experiences:\n${previousLogs}\n\nUser's New Goal: "${goal}"\n\nNow, begin. What is the first tool you will call?`;
     const history = [{ role: "user", parts: [{ text: initialPrompt }] }];
     const stepsTaken = [];
-
     let safetyLoop = 0;
+
     while (safetyLoop < 30) {
         safetyLoop++;
         try {
@@ -81,7 +70,6 @@ async function runAgent() {
             const call = response.functionCalls()?.[0];
 
             if (call) {
-                console.log(`\n⚙️ [AI DECISION] Calling tool: ${call.name} with arguments:`, call.args);
                 stepsTaken.push({ step: safetyLoop, tool: call.name, args: call.args });
                 history.push({ role: "model", parts: [{ functionCall: call }] });
 
@@ -100,20 +88,39 @@ async function runAgent() {
                     throw new Error(`AI tried to call a non-existent tool: '${call.name}'`);
                 }
             } else {
-                console.log("\n⚠️ [AI STUCK] Agent did not call a tool. Forcing it to log its confusion.");
                 throw new Error("Agent got stuck and did not produce a tool call.");
             }
 
         } catch (error) {
             console.error(`❌ [ERROR] ${error.message}`);
-            const errorLog = { mission_id: `mission_fail_${Date.now()}`, goal: goal, steps_taken: stepsTaken, final_outcome: `Failed with error: ${error.message}`, learnings: "I encountered an unexpected error and need to be more careful." };
-            await tools.logMission({ missionData: JSON.stringify(errorLog) });
-            await tools.commitAndPushChanges({ commitMessage: `log: Log failed mission` });
-            return;
+            
+            // === YEH HAI NAYA, SAHI ERROR HANDLING LOGIC ===
+            if (error.message && (error.message.includes("429") || error.message.includes("503") || error.message.includes("quota"))) {
+                console.log("Rate limit or server error detected. Switching to the next API key.");
+                currentKeyIndex++;
+                
+                if (currentKeyIndex >= apiKeys.length) {
+                    console.error("All API keys have been tried and failed. Stopping mission.");
+                    const failureLog = { mission_id: `mission_all_keys_failed_${Date.now()}`, goal: goal, steps_taken: stepsTaken, final_outcome: `Failed. All API keys are rate-limited.`, learnings: "I need a valid API key or a paid plan to continue." };
+                    await tools.logMission({ missionData: JSON.stringify(failureLog) });
+                    await tools.commitAndPushChanges({ commitMessage: `log: Log mission failure due to all keys exhausted` });
+                    return;
+                }
+                // Loop dobara shuru karo, taake agli key try ho sake
+                continue; 
+            } else {
+                // Agar koi aur, na-theek hone wala error hai, to use log karke ruk jao
+                console.error("An unrecoverable error occurred. Logging failure and stopping.");
+                const failureLog = { mission_id: `mission_unrecoverable_error_${Date.now()}`, goal: goal, steps_taken: stepsTaken, final_outcome: `Failed with an unrecoverable error: ${error.message}`, learnings: "I encountered a critical error and must stop." };
+                await tools.logMission({ missionData: JSON.stringify(failureLog) });
+                await tools.commitAndPushChanges({ commitMessage: `log: Log mission failure due to unrecoverable error` });
+                return;
+            }
+            // =================================================
         }
     }
     
-    console.error("❌ Agent exceeded maximum steps.");
+    console.error("❌ Agent exceeded maximum steps. Logging timeout and stopping.");
     const timeoutLog = { mission_id: `mission_timeout_${Date.now()}`, goal: goal, steps_taken: stepsTaken, final_outcome: "Failed by timeout. I was stuck in a loop.", learnings: "I need to find a way to get out of loops." };
     await tools.logMission({ missionData: JSON.stringify(timeoutLog) });
     await tools.commitAndPushChanges({ commitMessage: `log: Log mission timeout` });
