@@ -1,4 +1,4 @@
-// server.js (GOD MODE VERSION)
+// server.js (FINAL ACTION-ORIENTED VERSION)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -12,27 +12,22 @@ let currentKeyIndex = 0;
 
 if (!goal) { console.log("AGENT_GOAL not found."); process.exit(0); }
 
-// === NAYI SUPERPOWERS KI INFORMATION ===
-const toolConfig = {
-    functionDeclarations: [
-        // ... (purane tamam tools ki information yahan likhein) ...
-        { name: "createFile", description: "Creates a file with content.", /*...*/ },
-        { name: "readFile", description: "Reads a file.", /*...*/ },
-        { name: "updateFile", description: "Updates a file.", /*...*/ },
-        { name: "executeCommand", description: "Executes a shell command.", /*...*/ },
-        { name: "createGithubRepo", description: "Creates a GitHub repo.", /*...*/ },
-        { name: "commitAndPushChanges", description: "Commits and pushes changes.", /*...*/ },
-        { name: "wait", description: "Pauses execution.", /*...*/ },
-        // Naye tools ki information add karein
-        { name: "browseWebsite", description: "Fetches the text content of a given URL.", parameters: { type: "object", properties: { url: { type: "string", description: "The URL of the website to browse." } }, required: ["url"] } },
-        { name: "remember", description: "Saves a key-value pair to the agent's long-term memory.", parameters: { type: "object", properties: { key: { type: "string", description: "The key to remember." }, value: { type: "string", description: "The value to associate with the key." } }, required: ["key", "value"] } }
-    ]
-};
-// =====================================
+const toolConfig = { /* ... (toolConfig waisa hi hai, isay change na karein) ... */ };
 
 async function runAgent() {
+    // === YEH HAI NAYI AUR AHEM TABDEELI ===
+    // Hum goal ko ek "initial prompt" mein daal rahe hain jo agent ko foran kaam par lagaye
+    const initialPrompt = `
+    You are an AI agent. A user has given you a task.
+    User's Task: "${goal}"
+        
+    Analyze this task and decide the very first tool you should call to begin working on it.
+    Your response must be a direct tool call. Do not add any other text.
+    `;
+    // =====================================
+
     console.log(`\n[STARTING AGENT] New Goal: "${goal}"`);
-    const history = [{ role: "user", parts: [{ text: goal }] }];
+    const history = [{ role: "user", parts: [{ text: initialPrompt }] }]; // Agent ko naya, action-oriented prompt de rahe hain
     let safetyLoop = 0;
 
     while (safetyLoop < 30) {
@@ -42,17 +37,15 @@ async function runAgent() {
             console.log(`\n--- Agent's Turn (Step ${safetyLoop}) --- Using Key #${currentKeyIndex + 1}`);
             const genAI = new GoogleGenerativeAI(apiKey);
                 
-            // === BEHTAR DIMAGH (GEMINI 1.5 PRO) ===
             const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-pro-latest", // Flash se Pro par upgrade
+                model: "gemini-1.5-pro-latest",
                 tools: toolConfig,
-                systemInstruction: "You are a highly intelligent and autonomous AI agent. Your goal is to achieve the user's request by thinking step-by-step and calling the available tools. If you hit a rate limit, you will be switched to a new key automatically. Use your memory and browsing capabilities to solve complex problems.",
+                systemInstruction: "You are a helpful AI agent. Your goal is to achieve the user's request by calling the available tools in a step-by-step manner. Your response should always be a tool call, unless you are completely finished with the task.",
             });
-            // =====================================
 
             const result = await model.generateContent({ contents: history });
                 
-            // ... (baqi ka poora logic waisa hi rahega jaisa pichle message mein tha) ...
+            // ... (baqi ka poora logic waisa hi rahega) ...
 
         } catch (error) {
             // ... (error handling ka logic waisa hi rahega) ...
