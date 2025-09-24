@@ -1,17 +1,15 @@
 {
-  "name": "ai-agent-github-action",
+  "name": "ai-agent-backend",
   "version": "1.0.0",
-  "description": "An AI agent that runs via GitHub Actions.",
+  "description": "An autonomous AI agent running on GitHub Actions",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.15.0",
     "@octokit/rest": "^21.0.1",
+    "axios": "^1.7.2",
     "dotenv": "^16.4.5"
   }
 }
