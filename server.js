@@ -1,4 +1,4 @@
-// server.js (FINAL, TRULY FREE, DEEPSEEK AGENT)
+// server.js (FINAL, SIMPLE, DEEPSEEK-POWERED AGENT)
 require('dotenv').config();
 const tools = require('./tools.js');
 
@@ -6,7 +6,7 @@ const goal = process.env.AGENT_GOAL;
 const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 
 if (!goal || !openRouterApiKey) {
-    console.error("FATAL: AGENT_GOAL or OPENROUTER_API_KEY is not set in GitHub Secrets.");
+    console.error("FATAL: AGENT_GOAL or OPENROUTER_API_KEY is not set.");
     process.exit(1);
 }
 
@@ -20,34 +20,27 @@ const toolConfig = {
         { name: "createGithubRepo", description: "Creates a new GitHub repository." },
         { name: "commitAndPushChanges", description: "Commits and pushes all changes to the repository." },
         { name: "wait", description: "Pauses execution for a number of seconds." },
-        { name: "logMission", description: "Logs the result of a completed mission to the agent's long-term memory.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } }
+        { name: "logMission", description: "Logs the result of a completed mission.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } }
     ]
 };
 
-// === YEH HAI NAYA OPENROUTER LOGIC ===
 async function callOpenRouter(history) {
-    console.log("Calling OpenRouter with a free model...");
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
-        headers: {
-            "Authorization": `Bearer ${openRouterApiKey}`,
-            "Content-Type": "application/json"
-        },
+        headers: { "Authorization": `Bearer ${openRouterApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-            "model": "deepseek/deepseek-chat:free", // Hum naya, 100% free model istemal kar rahe hain!
+            "model": "mistralai/mistral-7b-instruct:free", // Mistral 7B is more reliable for tool use
             "messages": history,
             "tools": toolConfig.functionDeclarations.map(tool => ({ type: "function", function: tool })),
             "tool_choice": "auto"
         })
     });
-    if (!response.ok) {
-        throw new Error(`OpenRouter API Error: ${response.statusText} - ${await response.text()}`);
-    }
+    if (!response.ok) { throw new Error(`OpenRouter API Error: ${response.statusText} - ${await response.text()}`); }
     return await response.json();
 }
-// =====================================
 
 async function runAgent() {
+    // Bilkul saada history, jaisa shuru mein kamyab hua tha
     const history = [{ role: "user", content: goal }];
     let safetyLoop = 0;
 
@@ -56,7 +49,7 @@ async function runAgent() {
     while (safetyLoop < 30) {
         safetyLoop++;
         try {
-            console.log(`\n--- Agent's Turn (Step ${safetyLoop}) --- Calling DeepSeek Chat (Free)`);
+            console.log(`\n--- Agent's Turn (Step ${safetyLoop}) --- Calling Mistral 7B (Free)`);
             
             const responseJson = await callOpenRouter(history);
             const message = responseJson.choices[0].message;
