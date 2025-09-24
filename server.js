@@ -56,7 +56,7 @@ async function runAgent() {
                 
             // === BEHTAR DIMAGH (GEMINI 1.5 PRO) ===
             const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-pro-latest",
+                model: "gemini-1.5-flash"
                 tools: toolConfig,
                 systemInstruction: "You are a highly intelligent and autonomous AI agent. Your goal is to achieve the user's request by thinking step-by-step and calling the available tools. Analyze the user's goal and the results of your tool calls to decide your next action. If you hit a rate limit, you will be switched to a new key automatically.",
             });
