@@ -1,4 +1,4 @@
-// server.js (FINAL, PERFECTED, GOOGLE MULTI-KEY AGENT)
+// server.js (FINAL, GOD-TIER, SELF-IMPROVING AGENT)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -39,12 +39,12 @@ const toolConfig = {
 };
 
 async function runAgent() {
-    const history = [{ role: "user", parts: [{ text: goal }] }];
+    let history = [{ role: "user", parts: [{ text: goal }] }];
     let safetyLoop = 0;
 
     console.log(`\n[STARTING AGENT] New Goal: "${goal}"`);
 
-    while (safetyLoop < 30) {
+    while (safetyLoop < 40) { // Loop thora aur barha dete hain
         safetyLoop++;
         try {
             const apiKey = apiKeys[currentKeyIndex];
@@ -67,7 +67,25 @@ async function runAgent() {
                     console.log(`Tool Output: ${String(toolResult).substring(0, 300)}...`);
                     history.push({ role: "function", parts: [{ functionResponse: { name: call.name, response: { content: String(toolResult) } } }] });
                 } else {
-                    throw new Error(`AI tried to call a non-existent tool: '${call.name}'`);
+                    // === YEH HAI ASAL JADOO (SELF-IMPROVEMENT LOGIC) ===
+                    console.warn(`⚠️ [SELF-IMPROVEMENT] Agent tried to call a non-existent tool: '${call.name}'. Attempting to create it.`);
+                    
+                    const metaGoal = `
+                        The user wants to use a tool named '${call.name}' but it does not exist.
+                        Your task is to create this new tool.
+                        1. Read the 'tools.js' file to understand the existing code structure.
+                        2. Write the complete Node.js code for the new function '${call.name}'. It should take the arguments ${JSON.stringify(call.args)} and perform the expected action. Make sure to handle potential errors and return a meaningful string.
+                        3. Append this new function code to the 'tools.js' file using the 'updateFile' tool. You must read the file first, then append the new function at the end, before the 'module.exports' line.
+                        4. After updating 'tools.js', you MUST also update the 'module.exports' object at the end of the file to include the new function '${call.name}'.
+                        5. After successfully modifying the files, commit the changes with the message "feat: Self-create new tool '${call.name}'".
+                        After this, the main process will be restarted to use your new tool.
+                    `;
+                    
+                    // Purani history ko bhool jao aur naye, "meta" mission par lag jao
+                    history = [{ role: "user", parts: [{ text: metaGoal }] }];
+                    console.log("Switching to meta-task: Create the missing tool.");
+                    continue; // Loop dobara shuru karo, is naye meta-goal ke saath
+                    // =======================================================
                 }
             } else {
                 console.log("\n✅ [FINAL RESPONSE] Mission complete. Final response from AI:");
