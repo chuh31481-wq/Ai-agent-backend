@@ -1,11 +1,11 @@
-// tools.js (FINAL, COMPLETE, AND STANDARDIZED VERSION)
+// tools.js (FINAL, FLEXIBLE PARAMETER VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { Octokit } = require("@octokit/rest");
 
 const ROOT_DIR = process.cwd();
-const LOG_FILE = path.join(ROOT_DIR, 'agent_log.json');
+const LOG_FILE = 'agent_log.json';
 
 function getSafePath(fileName) {
     const absolutePath = path.resolve(ROOT_DIR, fileName);
@@ -15,60 +15,54 @@ function getSafePath(fileName) {
     return absolutePath;
 }
 
-// --- Tamam Standardized Tools ---
-
-async function createDirectory(args) {
-    const directoryName = args.directoryName || args.path || args.name;
+async function createDirectory({ directoryName }) {
     if (!directoryName) { return "Error: You must provide a directory name."; }
     const dirPath = getSafePath(directoryName);
     await fs.mkdir(dirPath, { recursive: true });
     return `Directory '${directoryName}' created successfully.`;
 }
 
+// === YEH HAI ASAL TABDEELI ===
 async function createFile(args) {
-    const fileName = args.fileName || args.file_name || args.name;
+    // AI kabhi 'fileName' bhejta hai, kabhi 'file_path'. Hum dono ko handle karenge.
+    const fileName = args.fileName || args.file_path || args.name;
     const content = args.content;
-    if (!fileName) { return "Error: You must provide a file name."; }
+
+    if (!fileName) { return "Error: You must provide a file name (fileName, file_path, or name)."; }
+    if (content === undefined) { return "Error: You must provide content for the file."; }
+
     const filePath = getSafePath(fileName);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, content || '');
+    await fs.writeFile(filePath, content);
     return `File '${fileName}' created successfully.`;
 }
+// ============================
 
-async function readFile(args) {
-    const fileName = args.fileName || args.file_name || args.path;
-    if (!fileName) { return "Error: You must provide a file name to read."; }
+async function readFile({ fileName }) {
+    if (!fileName) { return "Error: You must provide a file name."; }
     const filePath = getSafePath(fileName);
-    return await fs.readFile(filePath, 'utf-8');
+    const fileContent = await fs.readFile(filePath, 'utf-8');
+    return fileContent;
 }
 
-async function updateFile(args) {
-    const fileName = args.fileName || args.file_name || args.path;
-    const newContent = args.newContent || args.content;
-    if (!fileName) { return "Error: You must provide a file name to update."; }
+async function updateFile({ fileName, newContent }) {
+    if (!fileName || newContent === undefined) { return "Error: You must provide a file name and new content."; }
     const filePath = getSafePath(fileName);
-    await fs.writeFile(filePath, newContent || '');
+    await fs.writeFile(filePath, newContent);
     return `File '${fileName}' updated successfully.`;
 }
 
-function executeCommand(args) {
-    const command = args.command;
-    if (!command) { return Promise.resolve("Error: You must provide a command to execute."); }
-    const directory = args.directory || '';
-    const execDir = directory ? getSafePath(directory) : ROOT_DIR;
+function executeCommand({ command }) {
+    if (!command) { return "Error: You must provide a command to execute."; }
     return new Promise((resolve) => {
-        exec(command, { cwd: execDir }, (error, stdout, stderr) => {
-            if (error) {
-                resolve(`Execution Error: ${error.message}\nStderr: ${stderr}`);
-            } else {
-                resolve(`Command Output:\n${stdout}`);
-            }
+        exec(command, { cwd: ROOT_DIR }, (error, stdout, stderr) => {
+            if (error) { resolve(`Execution Error: ${error.message}\nStderr: ${stderr}`); } 
+            else { resolve(`Command Output:\n${stdout}`); }
         });
     });
 }
 
-async function createGithubRepo(args) {
-    const repoName = args.repoName || args.name;
+async function createGithubRepo({ repoName }) {
     if (!repoName) { return "Error: You must provide a repository name."; }
     const token = process.env.AGENT_GITHUB_TOKEN;
     if (!token) { return "Error: AGENT_GITHUB_TOKEN is not set."; }
@@ -81,45 +75,47 @@ async function createGithubRepo(args) {
     }
 }
 
-async function commitAndPushChanges(args) {
-    const commitMessage = args.commitMessage || args.message;
+async function commitAndPushChanges({ commitMessage }) {
     if (!commitMessage) { return "Error: You must provide a commit message."; }
     await executeCommand({ command: 'git config --global user.name "AI Agent"' });
     await executeCommand({ command: 'git config --global user.email "ai-agent@users.noreply.github.com"' });
     await executeCommand({ command: 'git add .' });
     const commitResult = await executeCommand({ command: `git commit -m "${commitMessage}"` });
-    if (commitResult.includes("nothing to commit")) {
-        return "No changes were detected to commit.";
-    }
+    if (commitResult.includes("nothing to commit")) { return "No changes were detected to commit."; }
     const pushResult = await executeCommand({ command: 'git push origin main' });
-    if (pushResult.includes("Execution Error")) {
-        return pushResult;
-    }
+    if (pushResult.includes("Execution Error")) { return pushResult; }
     return `Successfully committed and pushed changes with message: "${commitMessage}"`;
 }
 
 async function wait({ seconds }) {
-    if (typeof seconds !== 'number') { return "Error: Seconds must be a number."; }
+    if (!seconds) { return "Error: You must provide a number of seconds to wait."; }
     console.log(`Waiting for ${seconds} seconds...`);
     await new Promise(resolve => setTimeout(resolve, seconds * 1000));
     return `Successfully waited for ${seconds} seconds.`;
 }
 
 async function logMission({ missionData }) {
-    let logs = [];
+    if (!missionData) { return "Error: You must provide mission data to log."; }
+    let log = [];
     try {
-        // Yahan 'readFile' tool ko direct call karne ke bajaye, fs.readFile istemal karein
         const data = await fs.readFile(LOG_FILE, 'utf-8');
-        logs = JSON.parse(data);
+        log = JSON.parse(data);
     } catch (e) {
         console.log("Log file not found, creating a new one.");
     }
-    // Yahan JSON.parse() ki zaroorat nahi, kyunke AI ab seedha object bhejega
-    logs.push(missionData);
-    await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2));
-    return `Successfully logged the mission.`;
+    log.push(JSON.parse(missionData));
+    await fs.writeFile(LOG_FILE, JSON.stringify(log, null, 2));
+    return `Successfully logged the mission. The agent now has a new experience.`;
 }
 
 module.exports = {
-    createDirectory, createFile, readFile, updateFile, executeCommand, createGithubRepo, commitAndPushChanges, wait, logMission
+    createDirectory,
+    createFile,
+    readFile,
+    updateFile,
+    executeCommand,
+    createGithubRepo,
+    commitAndPushChanges,
+    wait,
+    logMission
 };
