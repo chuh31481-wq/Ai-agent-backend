@@ -1,26 +1,28 @@
-name: 🚀 AI Agent Project Builder
+name: 🚀 Premium AI Agent
+
 on:
   workflow_dispatch:
     inputs:
       project_goal:
-        description: 'What project should I build?'
+        description: 'Describe your project'
         required: true
-        default: 'Create a simple calculator web app'
-      project_type:
-        description: 'Type of project'
-        required: true
-        default: 'web-app'
+        default: 'Create a React todo app with backend API'
+      project_size:
+        description: 'Project complexity'
         type: choice
         options:
-          - web-app
-          - api
-          - full-stack
+        - small
+        - medium  
+        - large
+        default: 'medium'
 
 jobs:
-  build-project:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
     steps:
-    - name: 🎯 Checkout repository
+    - name: 🎯 Checkout code
       uses: actions/checkout@v4
       
     - name: ⚙️ Setup Node.js
@@ -30,22 +32,21 @@ jobs:
         cache: 'npm'
         
     - name: 📦 Install dependencies
-      run: npm install
-      
+      run: |
+        npm install
+        npm cache clean --force
+        
     - name: 🏗️ Run AI Agent
       env:
         AGENT_GOAL: ${{ inputs.project_goal }}
         GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
         GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+        NODE_ENV: production
       run: |
-        echo "Starting AI Agent with goal: $AGENT_GOAL"
-        timeout 1800 npm start || echo "Process completed or timed out"
+        echo "Starting Premium AI Agent..."
+        node server.js
         
-    - name: 📁 Upload generated project
-      uses: actions/upload-artifact@v4
-      with:
-        name: ai-generated-project
-        path: |
-          *
-          !node_modules/
-        retention-days: 7
+    - name: 📊 Results
+      run: |
+        echo "Project completed successfully!"
+        ls -la
