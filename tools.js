@@ -15,28 +15,28 @@ function getSafePath(fileName) {
     return absolutePath;
 }
 
-async function createDirectory({ directoryName }) {
-    if (!directoryName) { return "Error: You must provide a directory name."; }
+// === YEH HAI ASAL TABDEELI ===
+async function createDirectory(args) {
+    // AI kabhi 'directoryName' bhejta hai, kabhi 'path'. Hum dono ko handle karenge.
+    const directoryName = args.directoryName || args.path;
+
+    if (!directoryName) { return "Error: You must provide a directory name (directoryName or path)."; }
     const dirPath = getSafePath(directoryName);
     await fs.mkdir(dirPath, { recursive: true });
     return `Directory '${directoryName}' created successfully.`;
 }
+// ============================
 
-// === YEH HAI ASAL TABDEELI ===
 async function createFile(args) {
-    // AI kabhi 'fileName' bhejta hai, kabhi 'file_path'. Hum dono ko handle karenge.
     const fileName = args.fileName || args.file_path || args.name;
     const content = args.content;
-
     if (!fileName) { return "Error: You must provide a file name (fileName, file_path, or name)."; }
     if (content === undefined) { return "Error: You must provide content for the file."; }
-
     const filePath = getSafePath(fileName);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content);
     return `File '${fileName}' created successfully.`;
 }
-// ============================
 
 async function readFile({ fileName }) {
     if (!fileName) { return "Error: You must provide a file name."; }
