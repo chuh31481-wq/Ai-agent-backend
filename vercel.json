@@ -4,12 +4,33 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "projects/**/*.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/projects/(.*)",
+      "dest": "projects/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "server.js"
     }
-  ]
+  ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 300
+    }
+  },
+  "env": {
+    "AGENT_MODE": "production",
+    "NODE_ENV": "production"
+  }
 }
