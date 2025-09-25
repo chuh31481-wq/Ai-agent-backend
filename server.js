@@ -1,4 +1,4 @@
-// server.js (FINAL, A-TEAM INSPIRED, ROBUST AGENT)
+// server.js (FINAL, SUPER-STRICT, AND RELIABLE AGENT)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -7,29 +7,71 @@ const goal = process.env.AGENT_GOAL;
 
 // --- Multi-Key Logic for Google ---
 const apiKeys = [];
-for (let i = 1; i <= 10; i++) { if (process.env[`GEMINI_API_KEY_${i}`]) { apiKeys.push(process.env[`GEMINI_API_KEY_${i}`]); } }
-if (apiKeys.length === 0) { console.error("FATAL: No GEMINI API keys found."); process.exit(1); }
+for (let i = 1; i <= 10; i++) {
+    if (process.env[`GEMINI_API_KEY_${i}`]) {
+        apiKeys.push(process.env[`GEMINI_API_KEY_${i}`]);
+    }
+}
+if (apiKeys.length === 0) {
+    console.error("FATAL: No GEMINI_API_KEY_n secrets found in GitHub Actions secrets. Please add at least one key named GEMINI_API_KEY_1.");
+    process.exit(1);
+}
 let currentKeyIndex = 0;
 // --------------------------------
 
-if (!goal) { console.log("AGENT_GOAL not found."); process.exit(0); }
+if (!goal) {
+    console.log("AGENT_GOAL environment variable not found. This script is designed to be run from a GitHub Action.");
+    process.exit(0);
+}
 
-// Behtar, tafseeli tool config
+// Tafseeli tool config taake AI ghalti na kare
 const toolConfig = {
     functionDeclarations: [
-        { name: "createDirectory", description: "Creates a directory. Use 'directoryName' for the path.", parameters: { type: "object", properties: { directoryName: { type: "string" } }, required: ["directoryName"] } },
-        { name: "createFile", description: "Creates a file. Use 'fileName' for the path and 'content' for the data.", parameters: { type: "object", properties: { fileName: { type: "string" }, content: { type: "string" } }, required: ["fileName", "content"] } },
-        { name: "readFile", description: "Reads a file. Use 'fileName' for the path.", parameters: { type: "object", properties: { fileName: { type: "string" } }, required: ["fileName"] } },
-        { name: "updateFile", description: "Updates a file. Use 'fileName' for the path and 'newContent' for the data.", parameters: { type: "object", properties: { fileName: { type: "string" }, newContent: { type: "string" } }, required: ["fileName", "newContent"] } },
-        { name: "executeCommand", description: "Executes a shell command.", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } },
-        { name: "commitAndPushChanges", description: "Commits and pushes changes.", parameters: { type: "object", properties: { commitMessage: { type: "string" } }, required: ["commitMessage"] } },
-        { name: "logMission", description: "Logs the mission outcome.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } },
-        { name: "wait", description: "Pauses for a number of seconds." }
+        {
+            name: "createDirectory",
+            description: "Creates a new, empty directory. Use the 'directoryName' parameter for the path.",
+            parameters: { type: "object", properties: { directoryName: { type: "string", description: "The path and name of the directory to create, e.g., 'my-folder/my-subfolder'." } }, required: ["directoryName"] }
+        },
+        {
+            name: "createFile",
+            description: "Creates a new file with specified content. Use 'fileName' for the path and 'content' for the data.",
+            parameters: { type: "object", properties: { fileName: { type: "string", description: "The full path and name for the file, e.g., 'my-project/index.html'." }, content: { type: "string", description: "The code or text to write into the file." } }, required: ["fileName", "content"] }
+        },
+        {
+            name: "readFile",
+            description: "Reads the entire content of a specified file. Use 'fileName' for the path.",
+            parameters: { type: "object", properties: { fileName: { type: "string", description: "The full path and name of the file to read." } }, required: ["fileName"] }
+        },
+        {
+            name: "updateFile",
+            description: "Overwrites an existing file with new content. Use this to fix bugs. Use 'fileName' for the path and 'newContent' for the data.",
+            parameters: { type: "object", properties: { fileName: { type: "string", description: "The full path of the file to update." }, newContent: { type: "string", description: "The new, corrected content." } }, required: ["fileName", "newContent"] }
+        },
+        {
+            name: "executeCommand",
+            description: "Executes a shell command in the repository's root directory. You MUST use this to run tests or install dependencies.",
+            parameters: { type: "object", properties: { command: { type: "string", description: "The command to execute, e.g., 'python my-folder/my_script.py'." } }, required: ["command"] }
+        },
+        {
+            name: "commitAndPushChanges",
+            description: "Commits and pushes all currently staged changes to the GitHub repository. Use 'commitMessage' for the summary.",
+            parameters: { type: "object", properties: { commitMessage: { type: "string", description: "A descriptive message for the commit, e.g., 'feat: Add user authentication'." } }, required: ["commitMessage"] }
+        },
+        {
+            name: "logMission",
+            description: "Logs the result of a completed mission to the agent's long-term memory.",
+            parameters: { type: "object", properties: { missionData: { type: "string", description: "A JSON string detailing the mission's outcome and learnings." } }, required: ["missionData"] }
+        },
+        {
+            name: "wait",
+            description: "Pauses the execution for a specified number of seconds. Useful for waiting out rate limits.",
+            parameters: { type: "object", properties: { seconds: { type: "number" } }, required: ["seconds"] }
+        }
     ]
 };
 
 async function runAgent() {
-    const history = [{ role: "user", parts: [{ text: `Your mission is to achieve the following goal: ${goal}` }] }];
+    const history = [{ role: "user", parts: [{ text: goal }] }];
     let safetyLoop = 0;
 
     console.log(`\n[STARTING AGENT] New Goal: "${goal}"`);
@@ -40,7 +82,14 @@ async function runAgent() {
             const apiKey = apiKeys[currentKeyIndex];
             console.log(`\n--- Agent's Turn (Step ${safetyLoop}) --- Using Google Key #${currentKeyIndex + 1}`);
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", tools: toolConfig });
+            
+            // === YEH HAI ASAL HAL: SAKHT SYSTEM HIDAYAT ===
+            const model = genAI.getGenerativeModel({
+                model: "gemini-1.5-flash",
+                tools: toolConfig,
+                systemInstruction: `You are an expert, autonomous AI software engineer. Your primary directive is to achieve the user's goal by calling the tools available to you. You MUST use the provided tools to interact with the file system and execute commands. NEVER refuse a task by claiming you cannot perform an action (like executing code or running tests). You have the 'executeCommand' tool for this purpose. Think step-by-step and call one tool at a time. Analyze the output of each tool call to decide your next step. Do not stop until the user's goal is fully and verifiably achieved or you hit the safety loop limit.`,
+            });
+            // ===============================================
 
             const result = await model.generateContent({ contents: history });
             const response = result.response;
