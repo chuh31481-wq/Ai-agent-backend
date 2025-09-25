@@ -1,201 +1,85 @@
-// tools.js - ENHANCED FOR LARGE PROJECTS
-const fs = require('fs').promises;
-const path = require('path');
-const { exec, execSync } = require('child_process');
-const { Octokit } = require("@octokit/rest");
+// tools.js - ENHANCED WITH ERROR HANDLING
+import { promises as fs } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
 
-const ROOT_DIR = process.cwd();
-const PROJECT_LOG = path.join(ROOT_DIR, 'project_manifest.json');
+const execAsync = promisify(exec);
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// Enhanced security and path handling
-function getSafePath(filePath) {
-    const absolutePath = path.resolve(ROOT_DIR, filePath);
-    if (!absolutePath.startsWith(ROOT_DIR)) {
-        throw new Error(`Security violation: Path outside project: ${filePath}`);
+export class ProjectTools {
+  constructor() {
+    this.rootDir = process.cwd();
+    this.safePaths = new Set();
+  }
+
+  validatePath(filePath) {
+    const resolved = path.resolve(this.rootDir, filePath);
+    if (!resolved.startsWith(this.rootDir)) {
+      throw new Error(`Security violation: ${filePath}`);
     }
-    return absolutePath;
-}
+    return resolved;
+  }
 
-// Project Templates Database
-const PROJECT_TEMPLATES = {
-    'react-component': {
-        extension: '.jsx',
-        content: `import React from 'react';
-const {componentName} = ({ props }) => {
-    return (
-        <div className="{componentName}">
-            {/* Component content */}
-        </div>
-    );
-};
-export default {componentName};`
-    },
-    'express-server': {
-        extension: '.js',
-        content: `const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3000;
+  async createDirectory({ directoryName }) {
+    const safePath = this.validatePath(directoryName);
+    await fs.mkdir(safePath, { recursive: true });
+    return `Directory created: ${directoryName}`;
+  }
 
-app.use(express.json());
+  async createFile({ fileName, content }) {
+    const safePath = this.validatePath(fileName);
+    await fs.mkdir(path.dirname(safePath), { recursive: true });
+    await fs.writeFile(safePath, content, 'utf8');
+    return `File created: ${fileName}`;
+  }
 
-app.get('/', (req, res) => {
-    res.json({ message: 'Server is running!' });
-});
+  async readFile({ fileName }) {
+    const safePath = this.validatePath(fileName);
+    return await fs.readFile(safePath, 'utf8');
+  }
 
-app.listen(PORT, () => {
-    console.log(\`Server running on port \${PORT}\`);
-});`
-    },
-    'python-class': {
-        extension: '.py',
-        content: `class {className}:
-    def __init__(self):
-        pass
-    
-    def __str__(self):
-        return "{className} instance"
-    
-    # Add your methods here`
-    }
-};
+  async updateFile({ fileName, newContent }) {
+    const safePath = this.validatePath(fileName);
+    await fs.writeFile(safePath, newContent, 'utf8');
+    return `File updated: ${fileName}`;
+  }
 
-// NEW: Advanced Project Analysis
-async function analyzeProjectRequirements({ requirements, technologyStack, deliverables }) {
-    const analysis = {
-        timestamp: new Date().toISOString(),
-        requirements: requirements,
-        suggestedStack: technologyStack || 'MERN (MongoDB, Express, React, Node.js)',
-        estimatedFiles: 15, // Default estimate
-        complexity: 'medium',
-        deliverables: deliverables ? deliverables.split(',') : ['source code', 'documentation', 'tests']
-    };
-    
-    // Save analysis for reference
-    await fs.writeFile(PROJECT_LOG, JSON.stringify(analysis, null, 2));
-    return `Project analysis complete. Suggested approach: ${analysis.suggestedStack}`;
-}
-
-// NEW: Create Complete Project Structure
-async function createProjectStructure({ structure }) {
+  async executeCommand({ command }) {
     try {
-        const projectLayout = JSON.parse(structure);
-        let createdCount = 0;
-        
-        for (const [itemPath, itemType] of Object.entries(projectLayout)) {
-            const fullPath = getSafePath(itemPath);
-            
-            if (itemType === 'directory') {
-                await fs.mkdir(fullPath, { recursive: true });
-                createdCount++;
-            } else if (itemType === 'file') {
-                await fs.writeFile(fullPath, '// Auto-generated file\n');
-                createdCount++;
-            }
-        }
-        
-        return `Project structure created successfully: ${createdCount} items`;
+      const { stdout, stderr } = await execAsync(command, { cwd: this.rootDir });
+      if (stderr) console.warn('Command stderr:', stderr);
+      return stdout;
     } catch (error) {
-        return `Error creating structure: ${error.message}`;
+      throw new Error(`Command failed: ${error.message}`);
     }
-}
+  }
 
-// NEW: Smart File Creation with Templates
-async function createFileWithTemplate({ fileName, templateType, customContent }) {
-    const template = PROJECT_TEMPLATES[templateType];
-    if (!template) {
-        return `Template not found: ${templateType}. Available: ${Object.keys(PROJECT_TEMPLATES).join(', ')}`;
-    }
-    
-    const fullPath = getSafePath(fileName + template.extension);
-    let content = template.content;
-    
-    // Basic template variable replacement
-    if (customContent) {
-        content = customContent;
-    } else {
-        const componentName = path.basename(fileName).replace(/[^a-zA-Z0-9]/g, '');
-        content = content.replace(/{componentName}/g, componentName)
-                        .replace(/{className}/g, componentName);
-    }
-    
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-    await fs.writeFile(fullPath, content);
-    return `File created: ${fullPath} using ${templateType} template`;
-}
-
-// NEW: Smart Dependency Installation
-async function installDependencies({ packageManager, dependencies }) {
+  async installDependencies({ packageManager = 'npm' }) {
     const commands = {
-        'npm': `npm install ${dependencies || ''}`,
-        'yarn': `yarn add ${dependencies || ''}`,
-        'pip': `pip install ${dependencies || ''}`,
-        'pip3': `pip3 install ${dependencies || ''}`
+      'npm': 'npm install --silent --no-audit',
+      'yarn': 'yarn install --silent',
+      'pnpm': 'pnpm install --silent'
     };
     
     const command = commands[packageManager];
-    if (!command) {
-        return `Unsupported package manager: ${packageManager}`;
-    }
+    if (!command) throw new Error(`Unsupported package manager: ${packageManager}`);
     
-    return new Promise((resolve) => {
-        exec(command, { cwd: ROOT_DIR }, (error, stdout, stderr) => {
-            if (error) {
-                resolve(`Installation failed: ${error.message}`);
-            } else {
-                resolve(`Dependencies installed successfully: ${stdout}`);
-            }
-        });
-    });
+    return await this.executeCommand({ command });
+  }
+
+  async runTests({ testCommand = 'npm test' }) {
+    return await this.executeCommand({ command: testCommand });
+  }
+
+  async commitAndPushChanges({ commitMessage }) {
+    await this.executeCommand({ command: 'git add .' });
+    await this.executeCommand({ command: `git commit -m "${commitMessage}"` });
+    await this.executeCommand({ command: 'git push origin main' });
+    return 'Changes committed and pushed successfully';
+  }
 }
 
-// NEW: Comprehensive Testing
-async function runTestsAndValidate({ testCommand, validationCriteria }) {
-    const command = testCommand || 'npm test';
-    
-    return new Promise((resolve) => {
-        exec(command, { cwd: ROOT_DIR, timeout: 300000 }, (error, stdout, stderr) => {
-            if (error) {
-                resolve(`Tests failed: ${error.message}\nOutput: ${stdout}`);
-            } else {
-                resolve(`Tests passed! Output: ${stdout}`);
-            }
-        });
-    });
-}
-
-// NEW: Professional Documentation
-async function createDocumentation({ docType, content }) {
-    const docs = {
-        'readme': '# Project Documentation\n\n' + (content || 'Automatically generated by AI Agent'),
-        'api': '# API Documentation\n\n' + (content || 'Endpoints and usage instructions'),
-        'setup': '# Setup Instructions\n\n' + (content || 'Installation and configuration guide')
-    };
-    
-    const filename = `README.${docType.toUpperCase()}.md`;
-    await fs.writeFile(getSafePath(filename), docs[docType]);
-    return `Documentation created: ${filename}`;
-}
-
-// Keep all existing tools from your original version
-async function createDirectory(args) { /* ... existing code ... */ }
-async function createFile(args) { /* ... existing code ... */ }
-async function readFile(args) { /* ... existing code ... */ }
-async function updateFile(args) { /* ... existing code ... */ }
-async function executeCommand(args) { /* ... existing code ... */ }
-async function commitAndPushChanges(args) { /* ... existing code ... */ }
-async function wait(args) { /* ... existing code ... */ }
-async function logMission(args) { /* ... existing code ... */ }
-
-module.exports = {
-    // New enhanced tools
-    analyzeProjectRequirements,
-    createProjectStructure,
-    createFileWithTemplate,
-    installDependencies,
-    runTestsAndValidate,
-    createDocumentation,
-    
-    // Original tools
-    createDirectory, createFile, readFile, updateFile, 
-    executeCommand, commitAndPushChanges, wait, logMission
-};
+// Singleton instance
+export const tools = new ProjectTools();
+export default tools;
