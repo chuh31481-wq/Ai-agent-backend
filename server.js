@@ -1,4 +1,4 @@
-// server.js (FINAL, GOD-TIER, SELF-IMPROVING AGENT)
+// server.js (FINAL, A-TEAM INSPIRED, ROBUST AGENT)
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
@@ -7,44 +7,34 @@ const goal = process.env.AGENT_GOAL;
 
 // --- Multi-Key Logic for Google ---
 const apiKeys = [];
-for (let i = 1; i <= 10; i++) {
-    if (process.env[`GEMINI_API_KEY_${i}`]) {
-        apiKeys.push(process.env[`GEMINI_API_KEY_${i}`]);
-    }
-}
-if (apiKeys.length === 0) {
-    console.error("FATAL: No GEMINI_API_KEY_n secrets found in GitHub Actions secrets. Please add at least one key named GEMINI_API_KEY_1.");
-    process.exit(1);
-}
+for (let i = 1; i <= 10; i++) { if (process.env[`GEMINI_API_KEY_${i}`]) { apiKeys.push(process.env[`GEMINI_API_KEY_${i}`]); } }
+if (apiKeys.length === 0) { console.error("FATAL: No GEMINI API keys found."); process.exit(1); }
 let currentKeyIndex = 0;
 // --------------------------------
 
-if (!goal) {
-    console.log("AGENT_GOAL environment variable not found. This script is designed to be run from a GitHub Action.");
-    process.exit(0);
-}
+if (!goal) { console.log("AGENT_GOAL not found."); process.exit(0); }
 
+// Behtar, tafseeli tool config
 const toolConfig = {
     functionDeclarations: [
-        { name: "createDirectory", description: "Creates a new, empty directory in the repository." },
-        { name: "createFile", description: "Creates a new file with specified content in the repository." },
-        { name: "readFile", description: "Reads the entire content of a specified file." },
-        { name: "updateFile", description: "Updates an existing file with new content." },
-        { name: "executeCommand", description: "Executes a shell command in the repository's root directory." },
-        { name: "createGithubRepo", description: "Creates a new public GitHub repository on the user's account." },
-        { name: "commitAndPushChanges", description: "Commits and pushes all current changes to the GitHub repository." },
-        { name: "wait", description: "Pauses the execution for a specified number of seconds. Useful for waiting out rate limits." },
-        { name: "logMission", description: "Logs the result of a completed mission to the agent's long-term memory.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } }
+        { name: "createDirectory", description: "Creates a directory. Use 'directoryName' for the path.", parameters: { type: "object", properties: { directoryName: { type: "string" } }, required: ["directoryName"] } },
+        { name: "createFile", description: "Creates a file. Use 'fileName' for the path and 'content' for the data.", parameters: { type: "object", properties: { fileName: { type: "string" }, content: { type: "string" } }, required: ["fileName", "content"] } },
+        { name: "readFile", description: "Reads a file. Use 'fileName' for the path.", parameters: { type: "object", properties: { fileName: { type: "string" } }, required: ["fileName"] } },
+        { name: "updateFile", description: "Updates a file. Use 'fileName' for the path and 'newContent' for the data.", parameters: { type: "object", properties: { fileName: { type: "string" }, newContent: { type: "string" } }, required: ["fileName", "newContent"] } },
+        { name: "executeCommand", description: "Executes a shell command.", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } },
+        { name: "commitAndPushChanges", description: "Commits and pushes changes.", parameters: { type: "object", properties: { commitMessage: { type: "string" } }, required: ["commitMessage"] } },
+        { name: "logMission", description: "Logs the mission outcome.", parameters: { type: "object", properties: { missionData: { type: "string" } }, required: ["missionData"] } },
+        { name: "wait", description: "Pauses for a number of seconds." }
     ]
 };
 
 async function runAgent() {
-    let history = [{ role: "user", parts: [{ text: goal }] }];
+    const history = [{ role: "user", parts: [{ text: `Your mission is to achieve the following goal: ${goal}` }] }];
     let safetyLoop = 0;
 
     console.log(`\n[STARTING AGENT] New Goal: "${goal}"`);
 
-    while (safetyLoop < 40) { // Loop thora aur barha dete hain
+    while (safetyLoop < 40) {
         safetyLoop++;
         try {
             const apiKey = apiKeys[currentKeyIndex];
@@ -67,25 +57,7 @@ async function runAgent() {
                     console.log(`Tool Output: ${String(toolResult).substring(0, 300)}...`);
                     history.push({ role: "function", parts: [{ functionResponse: { name: call.name, response: { content: String(toolResult) } } }] });
                 } else {
-                    // === YEH HAI ASAL JADOO (SELF-IMPROVEMENT LOGIC) ===
-                    console.warn(`⚠️ [SELF-IMPROVEMENT] Agent tried to call a non-existent tool: '${call.name}'. Attempting to create it.`);
-                    
-                    const metaGoal = `
-                        The user wants to use a tool named '${call.name}' but it does not exist.
-                        Your task is to create this new tool.
-                        1. Read the 'tools.js' file to understand the existing code structure.
-                        2. Write the complete Node.js code for the new function '${call.name}'. It should take the arguments ${JSON.stringify(call.args)} and perform the expected action. Make sure to handle potential errors and return a meaningful string.
-                        3. Append this new function code to the 'tools.js' file using the 'updateFile' tool. You must read the file first, then append the new function at the end, before the 'module.exports' line.
-                        4. After updating 'tools.js', you MUST also update the 'module.exports' object at the end of the file to include the new function '${call.name}'.
-                        5. After successfully modifying the files, commit the changes with the message "feat: Self-create new tool '${call.name}'".
-                        After this, the main process will be restarted to use your new tool.
-                    `;
-                    
-                    // Purani history ko bhool jao aur naye, "meta" mission par lag jao
-                    history = [{ role: "user", parts: [{ text: metaGoal }] }];
-                    console.log("Switching to meta-task: Create the missing tool.");
-                    continue; // Loop dobara shuru karo, is naye meta-goal ke saath
-                    // =======================================================
+                    throw new Error(`AI tried to call a non-existent tool: '${call.name}'`);
                 }
             } else {
                 console.log("\n✅ [FINAL RESPONSE] Mission complete. Final response from AI:");
@@ -96,15 +68,12 @@ async function runAgent() {
 
         } catch (error) {
             console.error(`❌ [ERROR on Key #${currentKeyIndex + 1}] ${error.message}`);
-            
             if (error.message && (error.message.includes("429") || error.message.includes("quota"))) {
                 console.log(`Rate limit detected. Switching to the next API key.`);
-                currentKeyIndex++;
-                
-                if (currentKeyIndex >= apiKeys.length) {
-                    console.error("All API keys have been rate-limited. Waiting for 60 seconds as a last resort.");
+                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+                if (currentKeyIndex === 0) {
+                    console.error("All API keys exhausted. Waiting for 60 seconds.");
                     await tools.wait({ seconds: 60 });
-                    currentKeyIndex = 0;
                 }
                 continue; 
             } else {
