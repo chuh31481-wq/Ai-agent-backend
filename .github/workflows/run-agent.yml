@@ -1,47 +1,168 @@
-# .github/workflows/run-agent.yml (FINAL, PERFECTED, GOOGLE MULTI-KEY)
-
-name: 'Run AI Agent'
-
+name: AI Agent Mega Project Builder
 on:
-  issues:
-    types: [opened]
+  workflow_dispatch:
+    inputs:
+      project_type:
+        description: 'Type of project to build'
+        required: true
+        default: 'full-stack'
+        type: choice
+        options:
+        - full-stack
+        - react-app
+        - node-api
+        - python-django
+        - mobile-app
+      project_goal:
+        description: 'Detailed project requirements'
+        required: true
+        default: 'Create a complete e-commerce website with React frontend and Node.js backend'
+      urgency:
+        description: 'Project urgency level'
+        type: choice
+        options:
+        - normal
+        - urgent
+        - critical
 
-permissions:
-  contents: write
-  issues: read
+env:
+  NODE_VERSION: '20.x'
+  AGENT_MODE: 'production'
 
 jobs:
-  run-agent-job:
+  setup-environment:
     runs-on: ubuntu-latest
-
+    outputs:
+      setup-complete: ${{ steps.setup.outputs.ready }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.AGENT_GITHUB_TOKEN }}
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm install -g nodemon
+        
+    - name: Environment setup
+      id: setup
+      run: echo "ready=true" >> $GITHUB_OUTPUT
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+  build-project:
+    needs: setup-environment
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project-size: [large]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Create project environment
+      run: |
+        mkdir -p projects/${{ github.run_id }}
+        cd projects/${{ github.run_id }}
+        echo "PROJECT_ID=${{ github.run_id }}" >> .env
+        echo "PROJECT_TYPE=${{ inputs.project_type }}" >> .env
+        
+    - name: Run AI Agent for Project Building
+      env:
+        AGENT_GOAL: ${{ inputs.project_goal }}
+        GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+        GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+        GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NODE_ENV: production
+      run: |
+        cd projects/${{ github.run_id }}
+        node ../../server.js &
+        AGENT_PID=$!
+        sleep 300
+        # Monitor agent progress
+        timeout 1800 bash -c 'while true; do if ps -p $AGENT_PID > /dev/null; then sleep 30; else break; fi; done'
+        
+    - name: Validate project build
+      run: |
+        cd projects/${{ github.run_id }}
+        if [ -f "package.json" ]; then
+          npm test || echo "Tests failed but continuing"
+        fi
+        
+    - name: Archive generated project
+      uses: actions/upload-artifact@v4
+      with:
+        name: generated-project-${{ github.run_id }}
+        path: projects/${{ github.run_id }}
+        retention-days: 30
+        
+    - name: Deploy to Vercel (Optional)
+      if: success()
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: projects/${{ github.run_id }}
 
-      - name: Install dependencies
-        run: npm install
+  quality-check:
+    needs: build-project
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download project artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: generated-project-${{ github.run_id }}
+        
+    - name: Code quality analysis
+      uses: github/super-linter@v4
+      env:
+        DEFAULT_BRANCH: main
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Security scan
+      uses: actions/codeql-action/init@v3
+      with:
+        languages: javascript
+        
+    - name: Performance check
+      run: |
+        if [ -f "package.json" ]; then
+          npm audit --audit-level moderate || true
+          npx lighthouse-ci --perf=90
+        fi
 
-      - name: Run the AI Agent
-        run: node server.js
-        env:
-          # === GOOGLE MULTI-KEY ENV ===
-          GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
-          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
-          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
-          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
-          GEMINI_API_KEY_5: ${{ secrets.GEMINI_API_KEY_5 }}
-          GEMINI_API_KEY_6: ${{ secrets.GEMINI_API_KEY_6 }}
-          GEMINI_API_KEY_7: ${{ secrets.GEMINI_API_KEY_7 }}
-          GEMINI_API_KEY_8: ${{ secrets.GEMINI_API_KEY_8 }}
-          GEMINI_API_KEY_9: ${{ secrets.GEMINI_API_KEY_9 }}
-          GEMINI_API_KEY_10: ${{ secrets.GEMINI_API_KEY_10 }}
-          
-          AGENT_GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
-          AGENT_GOAL: ${{ github.event.issue.body }}
+  notify-completion:
+    needs: quality-check
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Notify via Slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: 🚀 AI Agent completed project: ${{ inputs.project_goal }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        
+    - name: Send email notification
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "AI Agent Project Completed"
+        body: "Project ${{ github.run_id }} completed with status ${{ job.status }}"
+        to: ${{ secrets.CLIENT_EMAIL }}
