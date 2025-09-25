@@ -1,107 +1,211 @@
-// server.js (FINAL, GOD-TIER, SELF-IMPROVING AGENT)
+// server.js - ENHANCED VERSION FOR LARGE PROJECTS
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const tools = require('./tools.js');
 
 const goal = process.env.AGENT_GOAL;
 
-// --- Multi-Key Logic ---
+// Enhanced Multi-Key Logic with Better Management
 const apiKeys = [];
-for (let i = 1; i <= 10; i++) { if (process.env[`GEMINI_API_KEY_${i}`]) { apiKeys.push(process.env[`GEMINI_API_KEY_${i}`]); } }
-if (apiKeys.length === 0) { console.error("FATAL: No GEMINI API keys found."); process.exit(1); }
+for (let i = 1; i <= 10; i++) {
+    if (process.env[`GEMINI_API_KEY_${i}`]) {
+        apiKeys.push(process.env[`GEMINI_API_KEY_${i}`]);
+    }
+}
+if (apiKeys.length === 0) {
+    console.error("FATAL: No GEMINI_API_KEY_n secrets found.");
+    process.exit(1);
+}
+
 let currentKeyIndex = 0;
-// ---------------------
+let projectContext = {
+    currentStep: 0,
+    completedTasks: [],
+    projectStructure: {},
+    dependencies: [],
+    errors: []
+};
 
-if (!goal) { console.log("AGENT_GOAL not found."); process.exit(0); }
-
-// Sirf buniyadi tools ki information, taake agent naye tools banane par majboor ho
+// Enhanced Tool Configuration for Large Projects
 const toolConfig = {
     functionDeclarations: [
-        { name: "readFile", description: "Reads the content of a file." },
-        { name: "updateFile", description: "Updates (or creates) a file with new content." },
-        { name: "executeCommand", description: "Executes a shell command." },
-        { name: "commitAndPushChanges", description: "Commits and pushes all changes to the repository." },
+        {
+            name: "analyzeProjectRequirements",
+            description: "Analyze project requirements and create a development plan",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    requirements: { type: "string" },
+                    technologyStack: { type: "string" },
+                    deliverables: { type: "string" }
+                }, 
+                required: ["requirements"] 
+            }
+        },
+        {
+            name: "createProjectStructure",
+            description: "Create complete project structure with folders and base files",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    structure: { type: "string", description: "JSON string describing project structure" } 
+                }, 
+                required: ["structure"] 
+            }
+        },
+        {
+            name: "createFileWithTemplate",
+            description: "Create file using appropriate template based on file type",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    fileName: { type: "string" },
+                    templateType: { type: "string", description: "e.g., react-component, express-server, python-class" },
+                    customContent: { type: "string" }
+                }, 
+                required: ["fileName", "templateType"] 
+            }
+        },
+        {
+            name: "installDependencies",
+            description: "Install project dependencies using appropriate package manager",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    packageManager: { type: "string", enum: ["npm", "yarn", "pip", "pip3", "maven", "gradle"] },
+                    dependencies: { type: "string", description: "Space separated list of packages" }
+                }, 
+                required: ["packageManager"] 
+            }
+        },
+        {
+            name: "runTestsAndValidate",
+            description: "Run tests and validate the project works correctly",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    testCommand: { type: "string" },
+                    validationCriteria: { type: "string" }
+                } 
+            }
+        },
+        {
+            name: "createDocumentation",
+            description: "Create project documentation including README and setup instructions",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    docType: { type: "string", enum: ["readme", "api", "setup", "deployment"] },
+                    content: { type: "string" }
+                }, 
+                required: ["docType"] 
+            }
+        },
+        // Existing tools (keep all from previous version)
+        ...require('./tools.js').toolConfig?.functionDeclarations || []
     ]
 };
 
 async function runAgent() {
-    let history = [{ role: "user", parts: [{ text: goal }] }];
+    const history = [{ 
+        role: "user", 
+        parts: [{ 
+            text: `CRITICAL MISSION: Create a complete, production-ready project based on these requirements: ${goal}
+            
+            You are an EXPERT FULL-STACK DEVELOPER with 10+ years experience. You MUST:
+            1. First analyze requirements and create a development plan
+            2. Set up proper project structure
+            3. Implement core functionality
+            4. Add tests and validation
+            5. Create comprehensive documentation
+            6. Ensure everything works perfectly
+            
+            Current project context: ${JSON.stringify(projectContext)}
+            Available technologies: React, Node.js, Python, Express, MongoDB, PostgreSQL, etc.
+            Deliver COMPLETE, WORKING solution in one go.` 
+        }] 
+    }];
+    
     let safetyLoop = 0;
+    const MAX_STEPS = 100; // Increased for large projects
 
-    console.log(`\n[STARTING AGENT] New Goal: "${goal}"`);
+    console.log(`\n🚀 [STARTING ENHANCED AGENT] Project: "${goal}"`);
 
-    while (safetyLoop < 40) {
+    while (safetyLoop < MAX_STEPS) {
         safetyLoop++;
         try {
             const apiKey = apiKeys[currentKeyIndex];
-            console.log(`\n--- Agent's Turn (Step ${safetyLoop}) --- Using Google Key #${currentKeyIndex + 1}`);
+            console.log(`\n--- Step ${safetyLoop}/${MAX_STEPS} --- Using Key #${currentKeyIndex + 1}`);
+            
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", tools: toolConfig });
+            const model = genAI.getGenerativeModel({
+                model: "gemini-1.5-pro", // More powerful model for complex projects
+                tools: toolConfig,
+                systemInstruction: `You are a SENIOR FULL-STACK DEVELOPER creating production-ready applications. 
+                Your expertise: React, Node.js, Python, Express, MongoDB, PostgreSQL, Docker, AWS.
+                Your process: Analysis → Planning → Implementation → Testing → Documentation.
+                CRITICAL: Always think step-by-step. Create COMPLETE projects. Handle errors gracefully.
+                NEVER leave tasks half-finished. Deliver WORKING solutions.`,
+            });
 
             const result = await model.generateContent({ contents: history });
             const response = result.response;
-            if (!response) { throw new Error("Model returned no response."); }
+            if (!response) throw new Error("No response from model");
 
             const call = response.functionCalls()?.[0];
 
             if (call) {
-                console.log(`\n⚙️ [AI DECISION] Calling tool: ${call.name} with arguments:`, call.args);
+                console.log(`\n🔧 [ACTION] ${call.name}`, call.args);
                 history.push({ role: "model", parts: [{ functionCall: call }] });
 
                 if (tools[call.name]) {
                     const toolResult = await tools[call.name](call.args);
-                    console.log(`Tool Output: ${String(toolResult).substring(0, 500)}...`);
-                    history.push({ role: "function", parts: [{ functionResponse: { name: call.name, response: { content: String(toolResult) } } }] });
+                    console.log(`📊 [RESULT] ${String(toolResult).substring(0, 500)}...`);
+                    
+                    // Update project context
+                    projectContext.currentStep = safetyLoop;
+                    projectContext.completedTasks.push(call.name);
+                    
+                    history.push({ 
+                        role: "function", 
+                        parts: [{ 
+                            functionResponse: { 
+                                name: call.name, 
+                                response: { 
+                                    content: String(toolResult),
+                                    projectContext: projectContext 
+                                } 
+                            } 
+                        }] 
+                    });
                 } else {
-                    // === YEH HAI ASAL JADOO (SELF-IMPROVEMENT LOGIC) ===
-                    console.warn(`⚠️ [SELF-IMPROVEMENT] Agent tried to call a non-existent tool: '${call.name}'. Attempting to create it.`);
-                    
-                    const metaGoal = `
-                        You are a master Node.js developer. Your current task is to add a new tool to your own source code because you tried to use a tool that doesn't exist.
-                        The missing tool is named '${call.name}'.
-                        The arguments you tried to pass to it were: ${JSON.stringify(call.args)}.
-
-                        Follow these steps precisely:
-                        1.  First, you MUST read your own tools file, which is located at 'tools.js', to understand its structure and how functions are exported.
-                        2.  Based on the name '${call.name}' and the arguments, write the complete, correct, and robust Node.js code for this new async function. It must use the existing 'getSafePath' and 'ROOT_DIR' conventions if it deals with files. It must handle errors and return a meaningful string.
-                        3.  Read the 'tools.js' file again.
-                        4.  Use the 'updateFile' tool to append the new function's code to the END of 'tools.js', just BEFORE the final 'module.exports = {' line.
-                        5.  After adding the function, you MUST update the 'module.exports' object in 'tools.js' to include the new tool '${call.name}'. Read the file, modify the exports block, and use 'updateFile' to save it.
-                        6.  Finally, commit your changes to your own source code with the commit message: "feat(self-improvement): Create and add new tool '${call.name}'".
-                        
-                        After you have successfully committed the changes, the system will restart, and your new tool will be available. Do not try to call the original missing tool again in this meta-mission. Just focus on creating and saving it.
-                    `;
-                    
-                    // Purani history ko bhool jao aur naye, "meta" mission par lag jao
-                    history = [{ role: "user", parts: [{ text: metaGoal }] }];
-                    console.log("Switching to meta-task: Create the missing tool.");
-                    continue; // Loop dobara shuru karo, is naye meta-goal ke saath
-                    // =======================================================
+                    throw new Error(`Tool not found: ${call.name}`);
                 }
             } else {
-                console.log("\n✅ [FINAL RESPONSE] Mission complete. Final response from AI:");
-                console.log(response.text());
-                console.log("🏁 [AGENT FINISHED]");
+                console.log("\n✅ [MISSION ACCOMPLISHED] Project completed successfully!");
+                console.log("Final AI Summary:", response.text());
+                console.log("📈 Project Statistics:", JSON.stringify(projectContext, null, 2));
                 return;
             }
 
         } catch (error) {
-            console.error(`❌ [ERROR on Key #${currentKeyIndex + 1}] ${error.message}`);
-            if (error.message && (error.message.includes("429") || error.message.includes("quota"))) {
-                console.log(`Rate limit detected. Switching to the next API key.`);
+            console.error(`❌ [ERROR] ${error.message}`);
+            
+            if (error.message.includes("429") || error.message.includes("quota")) {
                 currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-                if (currentKeyIndex === 0) {
-                    console.error("All API keys exhausted. Waiting for 60 seconds.");
-                    await tools.wait({ seconds: 60 });
-                }
-                continue; 
-            } else {
-                console.error("An unrecoverable error occurred. Stopping agent.");
-                return;
+                console.log(`🔄 Switching to API Key #${currentKeyIndex + 1}`);
+                await tools.wait({ seconds: 30 });
+                continue;
             }
+            
+            // For other errors, try to recover
+            projectContext.errors.push(error.message);
+            console.log("🛠️ Attempting to recover and continue...");
+            await tools.wait({ seconds: 10 });
         }
     }
-    console.error("❌ Agent exceeded maximum steps. Stopping.");
+    
+    console.error("❌ Maximum steps reached. Project may be incomplete.");
 }
 
 runAgent();
