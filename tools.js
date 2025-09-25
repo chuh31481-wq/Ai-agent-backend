@@ -1,4 +1,4 @@
-// tools.js (FINAL, FLEXIBLE PARAMETER VERSION)
+// tools.js (FINAL, PATH-AWARE VERSION)
 const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
@@ -15,28 +15,34 @@ function getSafePath(fileName) {
     return absolutePath;
 }
 
-// === YEH HAI ASAL TABDEELI ===
 async function createDirectory(args) {
-    // AI kabhi 'directoryName' bhejta hai, kabhi 'path'. Hum dono ko handle karenge.
     const directoryName = args.directoryName || args.path;
-
     if (!directoryName) { return "Error: You must provide a directory name (directoryName or path)."; }
     const dirPath = getSafePath(directoryName);
     await fs.mkdir(dirPath, { recursive: true });
     return `Directory '${directoryName}' created successfully.`;
 }
-// ============================
 
+// === YEH HAI ASAL TABDEELI ===
 async function createFile(args) {
-    const fileName = args.fileName || args.file_path || args.name;
+    let fileName = args.fileName || args.file_path || args.name;
     const content = args.content;
+
     if (!fileName) { return "Error: You must provide a file name (fileName, file_path, or name)."; }
     if (content === undefined) { return "Error: You must provide content for the file."; }
+
+    // Agar AI ne poora path nahi diya, to hum khud se add kar denge (heuristic)
+    if (fileName && !fileName.includes('/')) {
+        const potentialDir = 'bpo-summarizer-tool'; // Isay dynamic bhi kiya ja sakta hai
+        fileName = path.join(potentialDir, fileName);
+    }
+
     const filePath = getSafePath(fileName);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content);
     return `File '${fileName}' created successfully.`;
 }
+// ============================
 
 async function readFile({ fileName }) {
     if (!fileName) { return "Error: You must provide a file name."; }
@@ -45,7 +51,9 @@ async function readFile({ fileName }) {
     return fileContent;
 }
 
-async function updateFile({ fileName, newContent }) {
+async function updateFile(args) {
+    const fileName = args.fileName || args.file_path || args.name;
+    const newContent = args.newContent || args.content;
     if (!fileName || newContent === undefined) { return "Error: You must provide a file name and new content."; }
     const filePath = getSafePath(fileName);
     await fs.writeFile(filePath, newContent);
