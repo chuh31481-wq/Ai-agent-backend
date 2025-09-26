@@ -1,19 +1,14 @@
 {
-  "name": "project-god-ai",
+  "name": "ai-agent-github-actions",
   "version": "1.0.0",
-  "type": "module",
+  "description": "An autonomous AI agent running on GitHub Actions",
+  "main": "server.js",
   "scripts": {
-    "start": "node brain.js",
-    "dev": "node brain.js --mode=dev",
-    "build": "node builder.js --auto",
-    "deploy": "node deployer.js --auto"
+    "start": "node server.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
-    "axios": "^1.6.0",
-    "express": "^4.18.0",
-    "fs-extra": "^11.0.0",
-    "inquirer": "^8.0.0",
-    "chalk": "^4.1.0"
+    "@google/generative-ai": "^0.15.0",
+    "@octokit/rest": "^21.0.1",
+    "dotenv": "^16.4.5"
   }
 }
