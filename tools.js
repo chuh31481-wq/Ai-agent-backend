@@ -1,148 +1,117 @@
-import fs from 'fs-extra';
-import path from 'path';
-import { exec } from 'child-process-promise';
-import axios from 'axios';
+// tools.js (FINAL, FLEXIBLE, AND RELIABLE VERSION)
+const fs = require('fs').promises;
+const path = require('path');
+const { exec } = require('child_process');
+const { Octokit } = require("@octokit/rest");
 
-class Tools {
-    constructor() {
-        this.workDir = process.cwd();
+const ROOT_DIR = process.cwd();
+const LOG_FILE = 'agent_log.json';
+
+function getSafePath(fileName) {
+    const absolutePath = path.resolve(ROOT_DIR, fileName);
+    if (!absolutePath.startsWith(ROOT_DIR)) {
+        throw new Error(`Security Error: Attempted to access a path outside the project directory: ${fileName}`);
     }
+    return absolutePath;
+}
 
-    async createFile(filePath, content) {
-        try {
-            await fs.ensureDir(path.dirname(filePath));
-            await fs.writeFile(filePath, content, 'utf8');
-            return { success: true, path: filePath };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    }
+// Har function ab ghalat parameter naamon ko bhi handle karega
+async function createDirectory(args) {
+    const directoryName = args.directoryName || args.path;
+    if (!directoryName) { return "Error: You must provide a directory name (directoryName or path)."; }
+    const dirPath = getSafePath(directoryName);
+    await fs.mkdir(dirPath, { recursive: true });
+    return `Directory '${directoryName}' created successfully.`;
+}
 
-    async readFile(filePath) {
-        return await fs.readFile(filePath, 'utf8');
-    }
+async function createFile(args) {
+    const fileName = args.fileName || args.file_path || args.name;
+    const content = args.content;
+    if (!fileName) { return "Error: You must provide a file name (fileName, file_path, or name)."; }
+    if (content === undefined) { return "Error: You must provide content for the file."; }
+    const filePath = getSafePath(fileName);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, content);
+    return `File '${fileName}' created successfully.`;
+}
 
-    async fileExists(filePath) {
-        return await fs.pathExists(filePath);
-    }
-
-    async executeCommand(cmd, options = {}) {
-        try {
-            const result = await exec(cmd, { 
-                cwd: options.cwd || this.workDir,
-                timeout: 300000
-            });
-            return { success: true, output: result.stdout };
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message,
-                stderr: error.stderr 
-            };
-        }
-    }
-
-    async installDependencies(projectPath) {
-        const commands = [
-            { cmd: 'npm init -y', desc: 'Initialize package.json' },
-            { cmd: 'npm install express react react-dom', desc: 'Install basic dependencies' },
-            { cmd: 'npm install -D nodemon concurrently', desc: 'Install dev dependencies' }
-        ];
-
-        for (const { cmd, desc } of commands) {
-            console.log(`📦 ${desc}...`);
-            const result = await this.executeCommand(cmd, { cwd: projectPath });
-            if (!result.success) {
-                console.warn(`⚠️ Failed: ${cmd}`, result.error);
-            }
-        }
-    }
-
-    async setupGit(projectPath) {
-        const commands = [
-            'git init',
-            'git add .',
-            'git commit -m "Initial commit by Project God AI"'
-        ];
-
-        for (const cmd of commands) {
-            await this.executeCommand(cmd, { cwd: projectPath });
-        }
-    }
-
-    async createProjectStructure(basePath, structure) {
-        const dirs = [
-            'src/components',
-            'src/pages', 
-            'src/utils',
-            'public',
-            'docs',
-            'tests'
-        ];
-
-        for (const dir of dirs) {
-            await fs.ensureDir(path.join(basePath, dir));
-        }
-
-        console.log('✅ Project structure created');
-    }
-
-    async validateProject(projectPath) {
-        const checks = [
-            this.checkPackageJson(projectPath),
-            this.checkMainFiles(projectPath),
-            this.testBuild(projectPath)
-        ];
-
-        const results = await Promise.all(checks);
-        return results.every(r => r.valid);
-    }
-
-    async checkPackageJson(projectPath) {
-        const packagePath = path.join(projectPath, 'package.json');
-        if (await this.fileExists(packagePath)) {
-            const pkg = await fs.readJson(packagePath);
-            return { valid: true, name: pkg.name };
-        }
-        return { valid: false, error: 'package.json missing' };
-    }
-
-    async checkMainFiles(projectPath) {
-        const requiredFiles = ['package.json', 'README.md'];
-        const missing = [];
-
-        for (const file of requiredFiles) {
-            if (!(await this.fileExists(path.join(projectPath, file)))) {
-                missing.push(file);
-            }
-        }
-
-        return { 
-            valid: missing.length === 0, 
-            missing 
-        };
-    }
-
-    async testBuild(projectPath) {
-        if (await this.fileExists(path.join(projectPath, 'package.json'))) {
-            const result = await this.executeCommand('npm run build --dry-run', { 
-                cwd: projectPath 
-            });
-            return { valid: result.success };
-        }
-        return { valid: true, skip: true };
-    }
-
-    async downloadTemplate(templateUrl, destination) {
-        try {
-            const response = await axios.get(templateUrl);
-            await this.createFile(destination, response.data);
-            return true;
-        } catch (error) {
-            console.error('Download failed:', error.message);
-            return false;
-        }
+async function readFile(args) {
+    const fileName = args.fileName || args.path;
+    if (!fileName) { return "Error: You must provide a file name (fileName or path)."; }
+    const filePath = getSafePath(fileName);
+    try {
+        return await fs.readFile(filePath, 'utf-8');
+    } catch (error) {
+        return `Error reading file: ${error.message}`;
     }
 }
 
-export default Tools;
+async function updateFile(args) {
+    const fileName = args.fileName || args.file_path || args.name;
+    const newContent = args.newContent || args.content;
+    if (!fileName || newContent === undefined) { return "Error: You must provide a file name and new content."; }
+    const filePath = getSafePath(fileName);
+    await fs.writeFile(filePath, newContent);
+    return `File '${fileName}' updated successfully.`;
+}
+
+function executeCommand({ command }) {
+    if (!command) { return "Error: You must provide the 'command' parameter."; }
+    return new Promise((resolve) => {
+        exec(command, { cwd: ROOT_DIR }, (error, stdout, stderr) => {
+            if (error) { resolve(`Execution Error: ${error.message}\nStderr: ${stderr}`); } 
+            else { resolve(`Command Output:\n${stdout}`); }
+        });
+    });
+}
+
+async function commitAndPushChanges({ commitMessage }) {
+    if (!commitMessage) { return "Error: You must provide the 'commitMessage' parameter."; }
+    await executeCommand({ command: 'git config --global user.name "AI Agent"' });
+    await executeCommand({ command: 'git config --global user.email "ai-agent@users.noreply.github.com"' });
+    await executeCommand({ command: 'git add .' });
+    const commitResult = await executeCommand({ command: `git commit -m "${commitMessage}"` });
+    if (commitResult.includes("nothing to commit")) { return "No changes were detected to commit."; }
+    const pushResult = await executeCommand({ command: 'git push origin main' });
+    if (pushResult.includes("Execution Error")) { return pushResult; }
+    return `Successfully committed and pushed changes with message: "${commitMessage}"`;
+}
+
+async function createGithubRepo({ repoName }) {
+    if (!repoName) { return "Error: You must provide the 'repoName' parameter."; }
+    const token = process.env.AGENT_GITHUB_TOKEN;
+    if (!token) { return "Error: AGENT_GITHUB_TOKEN is not set."; }
+    const octokit = new Octokit({ auth: token });
+    try {
+        const response = await octokit.repos.createForAuthenticatedUser({ name: repoName });
+        return `Successfully created repository: ${response.data.html_url}`;
+    } catch (error) {
+        return `Error creating repository: ${error.message}`;
+    }
+}
+
+async function wait({ seconds }) {
+    if (!seconds) { return "Error: You must provide the 'seconds' parameter."; }
+    console.log(`Waiting for ${seconds} seconds...`);
+    await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+    return `Successfully waited for ${seconds} seconds.`;
+}
+
+async function logMission({ missionData }) {
+    if (!missionData) { return "Error: You must provide 'missionData'."; }
+    let logs = [];
+    try {
+        const data = await fs.readFile(LOG_FILE, 'utf-8');
+        logs = JSON.parse(data);
+    } catch (e) {
+        console.log("Log file not found, creating a new one.");
+    }
+    logs.push(JSON.parse(missionData));
+    await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2));
+    return `Successfully logged the mission. The agent now has a new experience.`;
+}
+
+module.exports = {
+    createDirectory, createFile, readFile, updateFile, executeCommand,
+    createGithubRepo, commitAndPushChanges, wait, logMission
+};
