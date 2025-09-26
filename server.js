@@ -1,150 +1,269 @@
-// server.js - ULTIMATE AI AGENT
-import 'dotenv/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { 
-  createDirectory, createFile, readFile, updateFile, 
-  executeCommand, commitAndPushChanges, wait,
-  analyzeProject, createProjectStructure, installDependencies,
-  runTests, createDocumentation, deployProject
-} from './tools.js';
+import fs from 'fs-extra';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import Tools from './tools.js';
+import Builder from './builder.js';
+import Deployer from './deployer.js';
+import SelfHeal from './self-heal.js';
 
-class PremiumAIAgent {
-  constructor() {
-    this.apiKeys = this.loadAPIKeys();
-    this.currentKeyIndex = 0;
-    this.projectContext = {
-      phase: 'planning',
-      completedTasks: [],
-      currentTask: '',
-      errors: [],
-      warnings: []
-    };
-  }
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-  loadAPIKeys() {
-    const keys = [];
-    for (let i = 1; i <= 5; i++) {
-      const key = process.env[`GEMINI_API_KEY_${i}`];
-      if (key && key.startsWith('AI')) keys.push(key);
+class ProjectGodAI {
+    constructor() {
+        this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+        this.tools = new Tools();
+        this.builder = new Builder();
+        this.deployer = new Deployer();
+        this.selfHeal = new SelfHeal();
+        
+        this.projects = new Map();
+        this.currentProject = null;
     }
-    if (keys.length === 0) {
-      throw new Error('❌ No valid Gemini API keys found. Add GEMINI_API_KEY_1 to secrets.');
+
+    async initialize() {
+        console.log('🚀 Project God AI Initializing...');
+        await this.healthCheck();
+        console.log('✅ Ready to build amazing projects!');
     }
-    return keys;
-  }
 
-  async executeTask(task, args) {
-    try {
-      this.projectContext.currentTask = task;
-      console.log(`🏃 Executing: ${task}`);
-      
-      const result = await this.tools[task](args);
-      this.projectContext.completedTasks.push({ task, success: true });
-      return result;
-    } catch (error) {
-      this.projectContext.errors.push({ task, error: error.message });
-      throw error;
+    async createProject(projectGoal, options = {}) {
+        try {
+            const projectId = 'proj_' + Date.now();
+            this.currentProject = {
+                id: projectId,
+                goal: projectGoal,
+                status: 'planning',
+                files: [],
+                errors: [],
+                startTime: Date.now()
+            };
+
+            this.projects.set(projectId, this.currentProject);
+
+            // Step 1: Analyze requirements
+            console.log('🔍 Analyzing project requirements...');
+            const analysis = await this.analyzeRequirements(projectGoal);
+            
+            // Step 2: Generate project plan
+            console.log('📋 Creating project plan...');
+            const plan = await this.generateProjectPlan(analysis);
+            
+            // Step 3: Build project structure
+            console.log('🏗️ Building project structure...');
+            const structure = await this.buildProjectStructure(plan);
+            
+            // Step 4: Generate code files
+            console.log('💻 Generating code files...');
+            await this.generateCodeFiles(structure);
+            
+            // Step 5: Setup deployment
+            console.log('☁️ Setting up deployment...');
+            await this.setupDeployment();
+            
+            // Step 6: Create documentation
+            console.log('📚 Creating documentation...');
+            await this.createDocumentation();
+
+            this.currentProject.status = 'completed';
+            this.currentProject.endTime = Date.now();
+            this.currentProject.duration = this.currentProject.endTime - this.currentProject.startTime;
+
+            await this.generateProjectReport();
+            return this.currentProject;
+
+        } catch (error) {
+            console.error('❌ Project creation failed:', error);
+            await this.selfHeal.handleError(error, this.currentProject);
+            throw error;
+        }
     }
-  }
 
-  async processGoal(goal) {
-    console.log(`🎯 Processing: ${goal}\n`);
-    
-    // Phase 1: Project Analysis
-    await this.executeTask('analyzeProject', { goal });
-    
-    // Phase 2: Structure Creation
-    await this.executeTask('createProjectStructure', {});
-    
-    // Phase 3: Core Implementation
-    await this.executeTask('createFile', { 
-      fileName: 'package.json', 
-      content: await this.generateFileContent('package.json', goal) 
-    });
-    
-    // Phase 4: Dependencies
-    await this.executeTask('installDependencies', {});
-    
-    // Phase 5: Testing
-    await this.executeTask('runTests', {});
-    
-    // Phase 6: Documentation
-    await this.executeTask('createDocumentation', {});
-    
-    // Phase 7: Deployment Ready
-    await this.executeTask('deployProject', {});
-    
-    console.log('✅ Project completed successfully!');
-    return this.projectContext;
-  }
+    async analyzeRequirements(goal) {
+        const prompt = `
+        Analyze this project goal and provide structured requirements:
+        "${goal}"
 
-  async generateFileContent(fileName, goal) {
-    // AI-powered file content generation
-    const genAI = new GoogleGenerativeAI(this.getCurrentAPIKey());
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    const prompt = `Create professional ${fileName} content for: ${goal}. 
-    Return ONLY the file content, no explanations.`;
-    
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  }
+        Provide JSON response with:
+        {
+            "projectType": "webapp|mobile|desktop|api",
+            "techStack": ["frontend", "backend", "database"],
+            "keyFeatures": ["feature1", "feature2"],
+            "complexity": "low|medium|high",
+            "estimatedFiles": number,
+            "specialRequirements": ["req1", "req2"]
+        }
+        `;
 
-  getCurrentAPIKey() {
-    return this.apiKeys[this.currentKeyIndex];
-  }
+        const response = await this.model.generateContent(prompt);
+        const analysis = JSON.parse(response.response.text());
+        this.currentProject.analysis = analysis;
+        return analysis;
+    }
 
-  switchAPIKey() {
-    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
-    console.log(`🔄 Switched to API Key ${this.currentKeyIndex + 1}`);
-  }
+    async generateProjectPlan(analysis) {
+        const prompt = `
+        Create a detailed project plan based on:
+        ${JSON.stringify(analysis, null, 2)}
+
+        Provide plan with:
+        {
+            "projectStructure": {
+                "rootDir": "project-name",
+                "subDirs": ["src", "public", "docs"],
+                "configFiles": ["package.json", "README.md"]
+            },
+            "implementationSteps": [
+                {"step": 1, "action": "setup", "files": []},
+                {"step": 2, "action": "core", "files": []}
+            ],
+            "dependencies": {
+                "frontend": ["react", "tailwind"],
+                "backend": ["express", "mongodb"]
+            }
+        }
+        `;
+
+        const response = await this.model.generateContent(prompt);
+        const plan = JSON.parse(response.response.text());
+        this.currentProject.plan = plan;
+        return plan;
+    }
+
+    async buildProjectStructure(plan) {
+        const projectDir = path.join(__dirname, 'projects', this.currentProject.id);
+        await fs.ensureDir(projectDir);
+        this.currentProject.directory = projectDir;
+
+        // Create subdirectories
+        for (const dir of plan.projectStructure.subDirs) {
+            await fs.ensureDir(path.join(projectDir, dir));
+        }
+
+        console.log(`✅ Project structure created at: ${projectDir}`);
+        return projectDir;
+    }
+
+    async generateCodeFiles(structure) {
+        const plan = this.currentProject.plan;
+        
+        for (const step of plan.implementationSteps) {
+            console.log(`📁 Generating files for step ${step.step}: ${step.action}`);
+            
+            for (const fileTemplate of step.files) {
+                await this.generateSingleFile(fileTemplate, structure);
+            }
+        }
+    }
+
+    async generateSingleFile(fileTemplate, baseDir) {
+        const prompt = `
+        Generate complete code for: ${fileTemplate.filePath}
+        
+        Requirements:
+        - Production-ready code
+        - No placeholder comments
+        - Complete functionality
+        - Error handling included
+        - Modern ES6+ syntax
+        
+        File type: ${fileTemplate.type}
+        Purpose: ${fileTemplate.purpose}
+        
+        Return ONLY the code without explanations.
+        `;
+
+        const response = await this.model.generateContent(prompt);
+        const filePath = path.join(baseDir, fileTemplate.filePath);
+        
+        await fs.ensureDir(path.dirname(filePath));
+        await fs.writeFile(filePath, response.response.text());
+        
+        this.currentProject.files.push(filePath);
+        console.log(`✅ Created: ${fileTemplate.filePath}`);
+    }
+
+    async setupDeployment() {
+        const deploymentConfig = await this.deployer.autoConfigure(this.currentProject);
+        this.currentProject.deployment = deploymentConfig;
+    }
+
+    async createDocumentation() {
+        const docs = `
+# ${this.currentProject.goal}
+
+## Project Details
+- **ID**: ${this.currentProject.id}
+- **Status**: ${this.currentProject.status}
+- **Created**: ${new Date().toISOString()}
+
+## Files Created
+${this.currentProject.files.map(f => `- ${f}`).join('\n')}
+
+## How to Run
+\`\`\`bash
+cd projects/${this.currentProject.id}
+npm install
+npm start
+\`\`\`
+        `;
+
+        const docsPath = path.join(this.currentProject.directory, 'README.md');
+        await fs.writeFile(docsPath, docs);
+    }
+
+    async generateProjectReport() {
+        const report = {
+            projectId: this.currentProject.id,
+            goal: this.currentProject.goal,
+            status: this.currentProject.status,
+            filesCreated: this.currentProject.files.length,
+            duration: `${(this.currentProject.duration / 1000).toFixed(2)} seconds`,
+            directory: this.currentProject.directory
+        };
+
+        const reportPath = path.join(this.currentProject.directory, 'project-report.json');
+        await fs.writeJson(reportPath, report, { spaces: 2 });
+        
+        console.log('📊 Project Report:', report);
+    }
+
+    async healthCheck() {
+        // Check if API key is valid
+        try {
+            await this.model.generateContent("Hello");
+            console.log('✅ Gemini API is working');
+        } catch (error) {
+            throw new Error('❌ Gemini API key invalid or not set');
+        }
+
+        // Check disk space
+        const diskInfo = await fs.stat(__dirname);
+        if (diskInfo.size < 1000000) {
+            console.warn('⚠️ Low disk space');
+        }
+    }
 }
 
-// Enhanced tools with error handling
-const tools = {
-  analyzeProject: async ({ goal }) => {
-    console.log('📊 Analyzing project requirements...');
-    await wait(1000);
-    return `Analysis complete for: ${goal}`;
-  },
-  
-  createProjectStructure: async () => {
-    const structure = {
-      'src/': 'directory',
-      'src/components/': 'directory',
-      'src/utils/': 'directory',
-      'public/': 'directory',
-      'tests/': 'directory',
-      'docs/': 'directory'
-    };
+// Export and run if called directly
+const aiAgent = new ProjectGodAI();
+await aiAgent.initialize();
+
+// Example usage
+if (process.argv[2] === '--create') {
+    const goal = process.argv[3] || "Create a React todo app with Node.js backend";
+    await aiAgent.createProject(goal);
+} else {
+    console.log(`
+    🚀 Project God AI Commands:
     
-    for (const [path, type] of Object.entries(structure)) {
-      if (type === 'directory') {
-        await createDirectory({ directoryName: path });
-      }
-    }
-    return 'Project structure created successfully';
-  },
-  
-  // ... other tools with enhanced error handling
-};
-
-// Main execution
-async function main() {
-  const goal = process.env.AGENT_GOAL;
-  if (!goal) {
-    console.log('ℹ️  Set AGENT_GOAL environment variable to start');
-    return;
-  }
-
-  try {
-    const agent = new PremiumAIAgent();
-    const result = await agent.processGoal(goal);
-    console.log('🎉 Final Result:', result);
-  } catch (error) {
-    console.error('💥 Critical Error:', error.message);
-    process.exit(1);
-  }
+    npm start -- --create "Your project goal here"
+    
+    Examples:
+    npm start -- --create "Create a portfolio website with React"
+    npm start -- --create "Build a REST API with Express and MongoDB"
+    `);
 }
 
-main();
+export default ProjectGodAI;
